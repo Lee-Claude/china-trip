@@ -290,6 +290,7 @@
   <section class="view" id="v-expo" data-page-node-id="bDFIF99OwfbwGfBHRYHu6U"></section>
   <section class="view" id="v-idea" data-page-node-id="ideaView001"></section>
   <section class="view" id="v-note" data-page-node-id="GB1x0O0go0PBQUiLUoYcFk"></section>
+  <section class="view" id="v-exp" data-page-node-id="expView001"></section>
   <section class="view" id="v-safe" data-page-node-id="nu9Au8G2QZeGD3lCgxfKmU"></section>
 </main>
 
@@ -323,6 +324,7 @@
   <button data-v="expo" data-page-node-id="YWCvkwTIvILtN0tTcwrB5L"><svg viewBox="0 0 24 24" data-page-node-id="9bM3ugD26b3hyQcJ7M9f02"><path d="M3 8h18v12H3z" data-page-node-id="J4F961a9KWBao3ZIgfdoeM"/><path d="M8 8V5h8v3" data-page-node-id="O80qioZRrPFKOWwnGU3vaE"/><path d="M8 14h8" data-page-node-id="0t7n8dAhDjcITKT0sfqdLL"/></svg>展会</button>
   <button data-v="idea" data-page-node-id="ideaNavBtn01"><svg viewBox="0 0 24 24" data-page-node-id="ideaNavIco01"><path d="M9 18h6M10 21h4" data-page-node-id="ideaNavPth01"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.4.3.5.8.5 1.1v1h6v-1c0-.3.1-.8.5-1.1A6 6 0 0 0 12 3z" data-page-node-id="ideaNavPth02"/></svg>灵感</button>
   <button data-v="note" data-page-node-id="tCy2dmFUGlyixEWzq6wNj3"><svg viewBox="0 0 24 24" data-page-node-id="BUfejml8l2aPFfbLHud8DC"><path d="M5 3h11l4 4v14H5z" data-page-node-id="hEPASz6svkA3dH4WGkP2BP"/><path d="M9 12h7M9 16h5" data-page-node-id="oPsFSdNJMIj8SoMOAjvdjg"/></svg>课程</button>
+  <button data-v="exp" data-page-node-id="expNav001"><svg viewBox="0 0 24 24" data-page-node-id="expNav002"><circle cx="12" cy="12" r="8" data-page-node-id="expNav003"/><path d="M9 9l3 3 3-3M12 12v5M9.5 13.5h5M9.5 15.5h5" data-page-node-id="expNav004"/></svg>费用</button>
   <button data-v="safe" data-page-node-id="RaLfi7p5z58eHRXwEksHio"><svg viewBox="0 0 24 24" data-page-node-id="bJdSiqtumLuW0GbY344ENQ"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" data-page-node-id="9NB3BvibcLkH2Yv6utCsps"/><path d="M9 12l2 2 4-4" data-page-node-id="PduPXjko8zV301WzPFrPFk"/></svg>存档</button>
 </nav>
 
@@ -356,10 +358,14 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-09.8";
+const BUILD="2026-09-09.9";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-09.9",c:[
+   "新增「费用」页：顶部总花费（人民币＋按汇率折欧元）、分类小计条形图、记一笔（分类/名称/金额/日期）、明细可删、一键复制汇总",
+   "已把已知的已订费用预填进去：G6020 ¥378、G695 ¥314、C7727 ¥20、携程保障 ¥44、林夕居 ¥1,056、一百米 ¥627、料理学院课程 ¥5,980（琶洲酒店还没金额，你补一下）",
+   "存档页也加了费用总计；导出备份会带上全部费用数据"]},
  {v:"2026-09-09.8",c:[
    "广州酒店改成琶洲酒店（新港东路 37 号，磨碟沙站 B 口 330 米，9/9–9/11 已订）——原岭南东方记录作废",
    "顺德段改成「朋友安排」：9/20 晚到容桂有人接站，住宿和考察都不用自己订，去掉所有待办提醒"]},
@@ -1157,6 +1163,8 @@ function renderSafe(){
   else if(days>=3) h+='<div class="banner red"><b>已经 '+days+' 天没导出备份了</b><br>行程期间建议每天收工导一次。</div>';
   else h+='<div class="banner ok"><b>上次备份：'+fmt(META.lastExport)+'</b><br>状态正常。</div>';
 
+  try{ h+='<h2 class="sec">费用总计</h2><div class="card"><div class="num" style="font-size:22px;font-weight:700">¥'+eNum(expTotal())+'</div>'
+    +'<p class="meta">共 '+((S.exp||[]).length)+' 笔 · 约 €'+eNum(expTotal()/(+S.rate||7.8))+'（汇率 1€='+(+S.rate||7.8)+'¥）· 明细看「费用」页</p></div>'; }catch(e){}
   h+='<div class="card"><h3>当前数据</h3><p class="num">'+sizeOf(S)+'</p>'
     +'<p class="meta">存储方式：'+(LS?"本机浏览器存储（localStorage）":(AS?"Claude 会话存储":"仅内存，关闭即失"))+'</p>'
     +'<p class="meta">代码版本：'+BUILD+'　·　存档点：'+SNAPS.length+' 个</p></div>';
@@ -1718,6 +1726,113 @@ fab.addEventListener("pointercancel",()=>{
 });
 window.addEventListener("resize",()=>{ if(fabPos) placeFab(fabPos,false); });
 
+
+/* ============ 费用统计（9/9 新增） ============ */
+const ECATS=["交通","住宿","餐饮","门票","采购样品","课程","其他"];
+const ECOLR={"交通":"#2A4C6B","住宿":"#6B4FA0","餐饮":"#B8801C","门票":"#2E7D6B","采购样品":"#A6412C","课程":"#1F6F8B","其他":"#7A8A85"};
+const ESEED=[
+ {c:"交通",n:"G6020 广州南→长沙南 9/11",a:378,d:"9/11",p:"已付"},
+ {c:"交通",n:"G695 长沙南→广州南 9/20",a:314,d:"9/20",p:"出票中"},
+ {c:"交通",n:"C7727 广州南→容桂 9/20",a:20,d:"9/20",p:"出票中"},
+ {c:"其他",n:"携程全能保障服务",a:44,d:"9/20",p:"出票中"},
+ {c:"住宿",n:"林夕居酒店 9/11-9/17（6晚）",a:1056.12,d:"9/11",p:"已付"},
+ {c:"住宿",n:"一百米酒店 9/17-9/20（3晚）",a:627,d:"9/17",p:"已付"},
+ {c:"课程",n:"濑户料理学院 寿司+刺身",a:5980,d:"9/12",p:"待确认"},
+ {c:"门票",n:"中食展 F2C（免费领）",a:0,d:"9/10",p:"免费"},
+ {c:"门票",n:"食餐会（预登记免票）",a:0,d:"9/18",p:"免费"}
+];
+function eNum(v){ const n=Math.round((+v||0)*100)/100; return n.toLocaleString("zh-CN",{maximumFractionDigits:2}); }
+function expTotal(){ return (S.exp||[]).reduce(function(s,x){ return s+(+x.a||0); },0); }
+function expSeed(){
+  if(S.expSeeded) return;
+  S.exp=ESEED.map(function(x,i){ return {id:"e0_"+i,c:x.c,n:x.n,a:x.a,d:x.d,p:x.p,ts:i,seed:1}; });
+  S.expSeeded=true; if(!S.rate) S.rate=7.8; save();
+}
+function renderExp(){
+  if(!Array.isArray(S.exp)) S.exp=[];
+  expSeed();
+  const rate=+S.rate||7.8;
+  const list=S.exp.slice().sort(function(a,b){ return String(a.d||"").localeCompare(String(b.d||""))||((b.ts||0)-(a.ts||0)); });
+  const tot=expTotal();
+  const byCat={}; ECATS.forEach(function(c){ byCat[c]=0; });
+  list.forEach(function(x){ byCat[x.c]=(byCat[x.c]||0)+(+x.a||0); });
+
+  let h='<div class="card" style="text-align:center;padding:16px 12px">'
+    +'<div class="meta" style="margin-bottom:4px">本次行程总花费</div>'
+    +'<div class="num" style="font-size:32px;font-weight:700;line-height:1.2">¥'+eNum(tot)+'</div>'
+    +'<div class="meta" style="margin-top:4px">≈ €'+eNum(tot/rate)+'　（1€ = '+rate+'¥）</div></div>';
+
+  h+='<h2 class="sec">分类小计</h2><div class="card">';
+  ECATS.forEach(function(c){
+    const v=byCat[c]||0;
+    const pct=tot?Math.round(v/tot*100):0;
+    h+='<div class="zrow"><span style="flex:0 0 58px;font-size:12.5px;font-weight:600;color:'+ECOLR[c]+'">'+esc(c)+'</span>'
+      +'<span style="flex:1;height:8px;background:var(--line);border-radius:4px;overflow:hidden">'
+      +'<span style="display:block;height:100%;width:'+pct+'%;background:'+ECOLR[c]+'"></span></span>'
+      +'<span class="num" style="flex:0 0 auto;font-size:12.5px;padding-left:6px">¥'+eNum(v)+' · '+pct+'%</span></div>';
+  });
+  h+='</div>';
+
+  h+='<h2 class="sec">记一笔</h2><div class="card">'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+    +'<select id="eCat" class="f" style="flex:1 1 92px;min-width:92px">'+ECATS.map(function(c){return '<option>'+c+'</option>';}).join("")+'</select>'
+    +'<input id="eName" class="f" placeholder="什么费用？" style="flex:2 1 150px;min-width:120px">'
+    +'<input id="eAmt" class="f num" type="number" inputmode="decimal" placeholder="金额 ¥" style="flex:1 1 92px;min-width:82px">'
+    +'<input id="eDay" class="f" placeholder="日期 9/10" style="flex:1 1 96px;min-width:88px">'
+    +'<button class="addchip" id="eAdd" style="flex:0 0 auto">＋ 记下</button></div>'
+    +'<div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">'
+    +'<span style="font-size:12.5px;color:var(--mute)">汇率 1€ =</span>'
+    +'<input id="eRate" class="f num" type="number" step="0.01" value="'+rate+'" style="width:82px">'
+    +'<span style="font-size:12.5px;color:var(--mute)">¥</span>'
+    +'<button class="chip" id="eCopy" style="margin-left:auto">复制汇总</button></div></div>';
+
+  h+='<h2 class="sec">明细（'+list.length+' 笔）</h2>';
+  if(!list.length){ h+='<div class="empty">还没记费用，上面填一行点「记下」就行</div>'; }
+  else{
+    h+='<div class="card" style="padding:4px 12px">';
+    list.forEach(function(x){
+      h+='<div style="display:flex;gap:9px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)">'
+        +'<span style="flex:0 0 5px;height:28px;border-radius:3px;background:'+(ECOLR[x.c]||"#7A8A85")+'"></span>'
+        +'<span style="flex:1;min-width:0"><b style="font-size:13.5px;font-weight:600">'+esc(x.n||"")+'</b>'
+        +'<span style="display:block;font-size:12px;color:var(--mute);margin-top:2px">'+esc(x.c||"")+'　'+esc(x.d||"")+(x.p?'　'+esc(x.p):"")+'</span></span>'
+        +'<span class="num" style="flex:0 0 auto;font-size:14px;font-weight:640">¥'+eNum(+x.a||0)+'</span>'
+        +'<button class="del" data-expdel="'+x.id+'" style="flex:0 0 auto">删</button></div>';
+    });
+    h+='</div>';
+  }
+  h+='<p style="font-size:12px;color:var(--mute);margin:8px 2px 0;line-height:1.5">单据直接发给我，我读金额帮你记进来；自己记也行。数据存在本机，导出备份里会带上。</p>';
+
+  document.getElementById("v-exp").innerHTML=h;
+
+  const add=document.getElementById("eAdd");
+  if(add) add.onclick=function(){
+    const n=(document.getElementById("eName").value||"").trim();
+    const a=parseFloat(document.getElementById("eAmt").value);
+    if(!n){ toast("写一下是什么费用"); return; }
+    if(isNaN(a)){ toast("填个金额"); return; }
+    S.exp.push({id:"e"+Date.now()+Math.random().toString(36).slice(2,6),
+      c:document.getElementById("eCat").value,n:n,a:a,
+      d:(document.getElementById("eDay").value||"").trim(),p:"",ts:Date.now()});
+    save(); renderExp(); toast("记下了 · 合计 ¥"+eNum(expTotal()));
+  };
+  const rt=document.getElementById("eRate");
+  if(rt) rt.onchange=function(){ S.rate=parseFloat(rt.value)||7.8; save(); renderExp(); };
+  const cp=document.getElementById("eCopy");
+  if(cp) cp.onclick=function(){
+    const t="中国行程 2026年9月 费用汇总\n合计：¥"+eNum(tot)+"（≈ €"+eNum(tot/rate)+"，汇率 1€="+rate+"¥）\n\n"
+      +ECATS.map(function(c){ return (byCat[c]?(c+"：¥"+eNum(byCat[c])+"\n"):""); }).join("")
+      +"\n明细：\n"+list.map(function(x){ return (x.d||"-")+"　"+x.c+"　"+x.n+"　¥"+eNum(+x.a||0); }).join("\n");
+    copyText(t,"费用汇总已复制");
+  };
+  document.querySelectorAll("[data-expdel]").forEach(function(b){
+    b.onclick=function(){
+      const id=b.getAttribute("data-expdel");
+      S.exp=S.exp.filter(function(x){ return x.id!==id; });
+      save(); renderExp(); toast("删掉了");
+    };
+  });
+}
+
 /* ---------- 事件 ---------- */
 document.addEventListener("click", e=>{
   const zoom=e.target.closest("[data-zoom]");
@@ -1851,6 +1966,7 @@ document.querySelectorAll("nav button").forEach(b=>{
     document.getElementById("v-"+b.dataset.v).classList.add("on");
     if(b.dataset.v==="safe") renderSafe();
     if(b.dataset.v==="idea"){ renderIdea(); fillNotes(); }
+    if(b.dataset.v==="exp") renderExp();
     fab.classList.remove("hide");   /* 悬浮球在所有页面都显示：随手记随时能加 */
     window.scrollTo(0,0);
   });
