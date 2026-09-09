@@ -1,0 +1,19 @@
+{
+  "name": "中国行程 · 2026年9月",
+  "short_name": "中国行程",
+  "description": "广州中食展 + 长沙食餐会 行程与展会作战台",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#E7EBE7",
+  "theme_color": "#2A4C6B",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
