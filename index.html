@@ -358,10 +358,12 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-10.1";
+const BUILD="2026-09-10.2";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-10.2",c:[
+   "展会页顶部新增「🗺️ 今日作战图」：按你现场拍的 11.1 馆展位图整理——先打冷冻食品专区+水产区，再广州酒家谈 OEM，武汉展区扫预制菜，右通道别漏了 11.2/12.2 馆"]},
  {v:"2026-09-10.1",c:[
    "按 9/9 账单核销 7 笔：机场快线 ¥98.55、西九龙→广州南高铁 ¥213.38、成都地铁 ¥11、农家菜午饭 ¥108、理发 ¥12、话费充值 ¥200（可删）、Apple ¥15（待查）",
    "同程那两笔 347+31=378 就是 G6020 车票的钱（拆两笔扣），不重复记；9/9 行程里高铁标为已购 ¥213.38"]},
@@ -1013,7 +1015,16 @@ function renderExpo(){
     +'<button class="ghost" id="manual">手填一张</button>'
     +'<button class="ghost" id="export">导出</button></div>';
 
-  h+='<div class="sechd"><h2>展商速查</h2><span class="msync">左边找谁，右边谈什么；看到新展台直接搜</span></div>'
+  h+='<h2 class="sec">🗺️ 今日作战图（11.1 馆实拍 9/10）</h2><div class="card"><ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:var(--ink-2)">'
+    +'<li><b>主入口 → 右手边：冷冻食品专区（B01–B09）＋ 水产区（B65–B72）</b>——你的预制菜/冻品核心区，最优先；旁边就是牛肉产销大会 Meat2China</li>'
+    +'<li><b>左手边走到头：广州酒家（AT16）</b>——粤式速冻点心/预制菜大厂，直接抛 OEM 出口的题</li>'
+    +'<li><b>中列：武汉市展区（AT08）</b>——湖北预制菜军团（热干面、藕汤、小龙虾）</li>'
+    +'<li><b>中上：供销社展区（AT02）</b>——农产品源头供应链，顺路</li>'
+    +'<li>快速扫：清远鸡（AT01）、梅州（AT07）、花都（AT03）、海口（B104）、南沙展区、哈尔滨市展区（B164–168）、从化展区（B138 有荔枝酒）</li>'
+    +'<li>左下<b>咖啡区</b>——沙冰/咖啡原料，跟韩式沙冰线相关，顺路</li>'
+    +'<li><b>右侧通道通往 11.2 / 12.2 馆</b>——西点烘焙展、Wine to China Fair、牛肉大会在那边，别只逛完 11.1 就走</li></ul>'
+    +'<p style="font-size:12px;color:var(--mute);margin:8px 0 0">名录墙在馆内，按公司名查到展位号 → 回「展商速查」搜这家，看谈什么。名录/展位图截止 9/4，现场以实际为准。</p></div>'
+    +'<div class="sechd"><h2>展商速查</h2><span class="msync">左边找谁，右边谈什么；看到新展台直接搜</span></div>'
     +'<input id="vendQ" placeholder="输入展商名字，马上查这家公司是干什么的、该谈什么" '
     +'style="width:100%;font:inherit;font-size:14.5px;padding:11px 13px;border:1.5px solid var(--indigo);border-radius:11px;background:#fff;color:var(--ink);margin-bottom:8px">'
     +'<div id="vendBox"></div>';
