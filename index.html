@@ -275,6 +275,20 @@
   .qcard .qhint{font-size:11.5px;color:var(--turmeric)}
   #qrZoom{position:fixed;inset:0;background:rgba(20,30,28,.93);display:none;z-index:9999;align-items:center;justify-content:center;flex-direction:column;padding:20px}
   #qrZoom img{max-width:86vw;max-height:68vh;background:#fff;padding:14px;border-radius:12px}
+
+  /* 展会作战清单（合并自「会展作战清单」网页，2026-09-11 Lee 要求并入展会页） */
+  .xbar{height:6px;background:var(--line);border-radius:4px;overflow:hidden;margin:4px 0 8px}
+  .xbar i{display:block;height:100%;width:0;background:var(--indigo);transition:width .25s}
+  .xgrp{margin-top:8px}
+  .xgrp h4{font-size:14px;margin:12px 0 2px;color:var(--ink);display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  .xgrp .xcnt{font-size:12px;color:var(--mute);font-weight:400;flex:none}
+  .xcheck{display:flex;gap:11px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line);
+    font-size:14.5px;line-height:1.45;cursor:pointer;color:var(--ink-2)}
+  .xcheck:first-child{border-top:0}
+  .xcheck input{width:21px;height:21px;flex:none;margin:2px 0 0;accent-color:var(--indigo)}
+  .xcheck.on{color:var(--mute);text-decoration:line-through}
+  .xcheck .sub{display:block;font-size:12.5px;color:var(--mute);margin-top:2px}
+  .mapline b{color:var(--turmeric)}
 </style>
 </head>
 <body data-page-node-id="npY45ZMLTF5zE2wvEvaGUo">
@@ -362,10 +376,13 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-11.11";
+const BUILD="2026-09-11.12";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-11.12",c:[
+   "★ 住宿页每家酒店加「打开地图」按钮：中国地址跳高德地图（自动定位、自己选出行方式），海外地址跳 Google 地图，手机点一下直达",
+   "★ 把「会展作战清单」网页合并进展会页：作战清单（5 组勾选 + 进度条，存在本机刷新不丢，可导出）、食餐会已知展商表、同期活动表、风险与待确认，均并入「展会」页"]},
  {v:"2026-09-11.11",c:[
    "修复 9/19、9/20 行程页缺入场二维码：QRDAY 原只挂 9/10/9/18，补 9/19/9/20 均挂食餐会签到码 shc（9/18–9/20 三天通用一码）",
    "凭证区签到码说明改为「9/18–9/20 行程页可点二维码放大」"]},
@@ -672,6 +689,24 @@ function cardBlock(){
 function meBlock(){
   const p=mePick();
   return ME.name+"　"+ME.phone+"\n"+(p?(p.name.replace(/✓已订/,"")+"\n"+p.addr):"");
+}
+
+/* 地图按钮：中国地址→高德地图（自动定位、自己选出行方式），海外地址→Google 地图。
+   手机上点一下直接跳对应 App / 网页（2026-09-11 Lee 要求加在住宿页） */
+function mapHref(addr){
+  const clean=addr.replace(/[（(].*?[)）]/g,"").replace(/\s+/g," ").trim();
+  const cn=/[一-龥]/.test(clean) && /(省|市|区|县|路|大道|街|镇|村|号|栋|广场|地铁|街道|新村|花园)/.test(clean);
+  return cn
+    ? "https://uri.amap.com/search?keyword="+encodeURIComponent(clean)
+    : "https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(clean);
+}
+function mapBtn(addr){
+  if(!addr||addr==="—") return "";
+  const u=mapHref(addr);
+  const cn=/[一-龥]/.test(addr.replace(/[（(].*?[)）]/g,"").replace(/\s+/g," ").trim())
+    && /(省|市|区|县|路|大道|街|镇|村|号|栋|广场|地铁|街道|新村|花园)/.test(addr);
+  return '<a class="ghost wide" href="'+u+'" target="_blank" rel="noopener"'
+    +' style="margin-top:10px;text-decoration:none;display:block;text-align:center">📍 打开地图（'+(cn?"高德":"Google")+'）导航到这个地址</a>';
 }
 
 const VOUCH=[
@@ -983,6 +1018,7 @@ function renderStay(){
         +'<span class="odist" style="display:block">'+esc(o.dist)+'</span>'
         +(o.warn?'<span class="warn" style="display:block">'+esc(o.warn)+'</span>':"")+'</span></button>';
     });
+    h+=mapBtn(s.opts[0]?s.opts[0].addr:"");
     h+='<div style="padding:12px 14px 14px;border-top:1px solid var(--line)">'
       +'<div class="nlab"><b style="font-size:13px">查到的实价 / 确认号</b></div>'
       +'<textarea data-note="hn_'+s.id+'" placeholder="携程查到多少、订的哪家、确认号、能不能免费取消"></textarea></div></div>';
@@ -1139,11 +1175,107 @@ function renderVend(){
 }
 
 /* ---------- 展会 ---------- */
+/* ---------- 展会作战清单（合并自「会展作战清单-2026年9月.html」，2026-09-11 并入展会页） ---------- */
+const EXPO_GROUPS=[
+ {id:"g0",label:"开展前（9/7–9/9）",items:[
+   {t:"打 18102214812 确认护照入场",s:"中食展：护照原件能否刷闸机？预登记要不要绑护照号？今天办，别拖"},
+   {t:"中食展观众预登记",s:"去真官网 food2chinaexpo.com（不是 gzfoodexpo.com），或公众号「F2C食品展」"},
+   {t:"食餐会观众预登记",s:"cfce-cn.com → 观众中心 → 观众报名，免费；现场票 9.9 元"},
+   {t:"写下希腊店的采购清单",s:"品类 + 大致月用量，一页纸。没有清单，逛展就是瞎逛"},
+   {t:"把采购清单发给食餐会组委会",s:"0731-89700609 廖先生，走 1:5 精准对接，提前匹配展商"},
+   {t:"打印名片 + 公司简介一页纸",s:"现场换名片用；公司简介让对方一眼看懂你是谁、要什么"}
+ ]},
+ {id:"g1",label:"中食展 F2C（9/10–9/11）",items:[
+   {t:"9/10 上午 10.2 馆：预制菜 / 调味品扫一遍",s:"目标：加厨宝、大汉口、能迈科、蒸大厨、江花调味"},
+   {t:"9/10 下午 12.2 + 13.2 馆",s:"肉禽海鲜冻品 → 包装机械与冷链保鲜，顺手摸冷链成本"},
+   {t:"9/10 收工：名片扫进「展会」页",s:"当天录，别攒着 —— 三天后你就认不出谁是谁了"},
+   {t:"9/11 上午 10.2 补漏 + 9.2 地标农产",s:"重点问出口经验和 MOQ"},
+   {t:"9/11 下午 进口食品专场对接会",s:"时间未公布，进馆先到服务台问；坐下来谈比逛展位效率高"},
+   {t:"每天收工导出一次名片",s:"行程 App 展会页的导出，复制给 Claude 加工"}
+ ]},
+ {id:"g2",label:"长沙上课间隙（9/12–9/17）",items:[
+   {t:"把中食展名片整理成名单",s:"按「能直接用 / 要改造 / 只是好看」分三档"},
+   {t:"给 A 档供应商发第一轮邮件",s:"48 小时内发，附上采购清单，趁对方还记得你"},
+   {t:"确认样品寄送地址与费用",s:"寄德国还是希腊？谁付运费？"},
+   {t:"刷一遍食餐会官网展商推介",s:"cfce-cn.com，出发前把要看的厂家列出来"}
+ ]},
+ {id:"g3",label:"食餐会（9/18–9/20）",items:[
+   {t:"9/18 北登录厅拿平面图，先去 E2 湘菜出海专区",s:"全场唯一明确面向海外采购的板块"},
+   {t:"9/18 W3 馆调味品 + E3/E4 设备",s:"复合调味酱、火锅底料、中央厨房与包装设备"},
+   {t:"9/19 参加 E3 源头供应链对接（10:00–16:30）",s:"采购对接日，带够名片"},
+   {t:"9/20 上午优先：09:30 W2 东盟对接会 + 补访",s:"13:00 闭馆，12:30 停止入场"},
+   {t:"逢摊必问：能不能出欧盟",s:"出不了的当场结束，别浪费时间"},
+   {t:"每天收工导出名片 + 记样品发运方式",s:"海运 / 空运，别塞行李箱 —— 回程香港段手提限 10kg"}
+ ]},
+ {id:"g4",label:"展后（9/21–9/23）",items:[
+   {t:"样品打包发运，和货代确认",s:"海运为主，易腐的走空运；留好单号"},
+   {t:"补访没谈完的供应商",s:"9/22 机动日，广州"},
+   {t:"给所有 A 档供应商发正式询价",s:"列明规格、MOQ、标签要求、目标价"},
+   {t:"把两个展的全部记录导出存档",s:"行程 App 的 .json 备份，别只留手机上"}
+ ]}
+];
+
+const EXPO_KEY="wb-expo-checklist-v1";
+let expoDone={};
+try{ expoDone=JSON.parse(localStorage.getItem(EXPO_KEY)||"{}")||{}; }catch(e){ expoDone={}; }
+function expoSave(){ try{ localStorage.setItem(EXPO_KEY,JSON.stringify(expoDone)); }catch(e){} }
+function expoToggle(cb){
+  expoDone[cb.id]=cb.checked; expoSave();
+  cb.closest(".xcheck").classList.toggle("on",cb.checked);
+  let total=0,ok=0;
+  EXPO_GROUPS.forEach(g=>g.items.forEach((it,i)=>{ total++; if(expoDone[g.id+"-"+i]) ok++; }));
+  const bar=document.getElementById("expoBar"); if(bar) bar.style.width=(total?Math.round(ok/total*100):0)+"%";
+  const lab=document.getElementById("expoCnt"); if(lab) lab.textContent=ok+" / "+total+" 项已勾";
+}
+function expoReset(){
+  expoDone={}; expoSave(); expoRender(); toast("已清空所有勾选");
+}
+function expoExport(){
+  let out="展会作战清单 · 2026年9月\n（来自「中国行程」App · 展会页）\n";
+  EXPO_GROUPS.forEach(g=>{
+    out+="\n【"+g.label+"】\n";
+    g.items.forEach((it,i)=>{ out+=(expoDone[g.id+"-"+i]?"[x] ":"[ ] ")+it.t+(it.s?"（"+it.s+"）":"")+"\n"; });
+  });
+  copyText(out,"已复制展会作战清单，粘到备忘录或发给 Claude");
+}
+function expoRender(){
+  const box=document.getElementById("expoChecklist"); if(!box) return;
+  let html="";
+  EXPO_GROUPS.forEach(g=>{
+    html+='<div class="xgrp"><h4>'+esc(g.label)+' <span class="xcnt" id="xc-'+g.id+'"></span></h4><div class="xitems">';
+    g.items.forEach((it,i)=>{
+      const id=g.id+"-"+i, on=!!expoDone[id];
+      html+='<label class="xcheck'+(on?" on":"")+'"><input type="checkbox" id="'+id+'"'+(on?" checked":"")
+        +' onchange="expoToggle(this)"><span>'+esc(it.t)+(it.s?'<span class="sub">'+esc(it.s)+'</span>':"")+'</span></label>';
+    });
+    html+='</div></div>';
+  });
+  box.innerHTML=html;
+  EXPO_GROUPS.forEach(g=>{
+    let t=g.items.length,o=0; g.items.forEach((it,i)=>{ if(expoDone[g.id+"-"+i]) o++; });
+    const el=document.getElementById("xc-"+g.id); if(el) el.textContent=o+" / "+t;
+  });
+  let total=0,ok=0;
+  EXPO_GROUPS.forEach(g=>g.items.forEach((it,i)=>{ total++; if(expoDone[g.id+"-"+i]) ok++; }));
+  const bar=document.getElementById("expoBar"); if(bar) bar.style.width=(total?Math.round(ok/total*100):0)+"%";
+  const lab=document.getElementById("expoCnt"); if(lab) lab.textContent=ok+" / "+total+" 项已勾";
+}
+
 function renderExpo(){
   let h='<div class="scanbar">'
     +'<button class="scanbtn" id="scan"><svg viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M7 12h10"/></svg>拍照 / 选图</button>'
     +'<button class="ghost" id="manual">手填一张</button>'
     +'<button class="ghost" id="export">导出</button></div>';
+
+  h+='<h2 class="sec">📋 展会作战清单（勾完自动存，进度跟着你）</h2><div class="card">'
+    +'<div class="xbar"><i id="expoBar"></i></div>'
+    +'<p class="meta" id="expoCnt" style="margin:0 0 4px"></p>'
+    +'<div id="expoChecklist"></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
+    +'<button class="ghost" id="expoExp" style="flex:1;min-width:96px">导出清单</button>'
+    +'<button class="ghost" id="expoRst" style="flex:1;min-width:96px">全部清空</button>'
+    +'</div>'
+    +'<p style="font-size:12px;color:var(--mute);margin:8px 0 0;line-height:1.5">合并自「会展作战清单」网页。勾选存在本机，刷新不丢；「导出清单」可复制给 Claude 加工。</p></div>';
 
   h+='<h2 class="sec">🎯 食餐会 9/18–20 作战计划（主战场）</h2><div class="card"><ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:var(--ink-2)">'
     +'<li><b>入口：北登录厅</b>（南登录厅不开）；W 区与 E 区由 C1–C5 连接厅<b>同层互通</b>，不用出馆</li>'
@@ -1157,6 +1289,40 @@ function renderExpo(){
     +'<li><b>对接靠邮件</b>：需求发 cfce_hn@163.com（客户联络中心 0731-82287397），无在线申请表，至少提前一周</li>'
     +'<li><b>交通</b>：一百米酒店 → 地铁 2 号线 1 站 3 分钟到光达站（比打车稳）；展馆周边吃饭少，早晚餐去南站东广场 / 长沙高铁吾悦广场</li></ul>'
     +'<button class="ghost wide" id="mailCopy" style="margin-top:10px">📧 复制给组委会的需求邮件</button></div>';
+
+  h+='<h2 class="sec">🏢 食餐会已知展商（少数有展位号）</h2><div class="card" style="overflow-x:auto"><table style="min-width:480px;width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.45">'
+    +'<tr><th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);color:var(--mute);font-size:11.5px">展商</th>'
+    +'<th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);color:var(--mute);font-size:11.5px">看点</th>'
+    +'<th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);color:var(--mute);font-size:11.5px">展位</th></tr>'
+    +[['<b style="color:var(--turmeric)">★★</b> 湖南聚尔康茶油','茶油 / 粮油，出口导向','W2-M35'],
+      ['<b style="color:var(--turmeric)">★★</b> 江西煌上煌','卤味肉制品，上市生产型','W2-M34 / W3-J18'],
+      ['★ 湖南湖湘肴食品','预制湘菜，生产型','W2-E48-E49'],
+      ['★ 张家界冻功夫科技','冻品','官网推介'],
+      ['★ 湖南康源沙田控股','沙田包子 · 面点预制','官网推介'],
+      ['★ 苏州峻茂视觉','智能分选设备','官网推介'],
+      ['湖南麻辣王子 / 湖南双娇','休闲辣条（除非希腊店要做零食线）','W3-A22']]
+      .map(r=>'<tr><td style="padding:8px 6px;border-bottom:1px solid var(--line)">'+r[0]+'</td>'
+        +'<td style="padding:8px 6px;border-bottom:1px solid var(--line);color:var(--ink-2)">'+r[1]+'</td>'
+        +'<td style="padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap;color:var(--indigo);font-weight:600">'+r[2]+'</td></tr>').join("")
+    +'</table>'
+    +'<p style="font-size:12px;color:var(--mute);margin:8px 0 0;line-height:1.5">官网 cfce-cn.com「展商推介」还有云南锦亿（菌菇）、资兴山水天然（鱼制品）、张家界泰益（腊味）、湖南源梅之家（冰杨梅冻品）等湖南本地厂家，出发前值得再刷一遍。</p></div>';
+
+  h+='<h2 class="sec">📅 食餐会同期活动（按时间）</h2><div class="card" style="overflow-x:auto"><table style="min-width:480px;width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.45">'
+    +'<tr><th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);color:var(--mute);font-size:11.5px">时间</th>'
+    +'<th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);color:var(--mute);font-size:11.5px">活动</th>'
+    +'<th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);color:var(--mute);font-size:11.5px">地点</th></tr>'
+    +[['9/18 09:30','开幕式','W1'],
+      ['9/18 13:30–16:00','湘菜餐饮 × 食材生态产业发展大会','E3'],
+      ['9/18 15:00–17:00','韩国优秀商品对接会','W3'],
+      ['9/18 15:00–17:00','海南胡椒招商推介会','W2'],
+      ['9/19 上午','味道湖南 · 首届世界湘菜大会','W2'],
+      ['9/19 10:00–16:30','第三届粉面饭快餐产业大会暨源头供应链对接','E3'],
+      ['9/20 09:30–12:00','喜湘盟湖南 – 东盟经贸合作对接会','W2'],
+      ['待定','「餐饮出海」与国际友城经贸对接会','未标注']]
+      .map(r=>'<tr><td style="padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap;color:var(--indigo);font-weight:600">'+r[0]+'</td>'
+        +'<td style="padding:8px 6px;border-bottom:1px solid var(--line)">'+r[1]+'</td>'
+        +'<td style="padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap">'+r[2]+'</td></tr>').join("")
+    +'</table></div>';
 
   h+='<h2 class="sec">🗺️ 作战图（按实拍校准 9/10 中午）</h2><div class="card"><ul style="margin:0;padding-left:18px;font-size:13.5px;line-height:1.7;color:var(--ink-2)">'
     +'<li><b>你现在的 11.2 馆 = 烘焙/酒水/进口食品</b>（世界面包大赛 CT03、亚洲青年烘焙大赛 CT02、Wine to China）——沙冰/咖啡/烘焙原料可顺手看，主力不在这，别耗太久</li>'
@@ -1273,11 +1439,25 @@ function renderExpo(){
       +'<td style="padding:8px 6px;border-bottom:1px solid var(--line);color:var(--ink-2)">'+esc(r[3])+'</td></tr>').join("")
     +'</table></div>';
 
+  h+='<h2 class="sec">⚠️ 风险与待确认（现场搞定）</h2><div class="card">'
+    +'<div style="font-size:13px;color:var(--ink-2);line-height:1.55;margin:4px 0"><b>① 护照入场</b> — 中食展官方说护照可用，第三方只写身份证。出发前打电话确认。</div>'
+    +'<div style="font-size:13px;color:var(--ink-2);line-height:1.55;margin:8px 0"><b>② 中食展三场对接会具体时间与报名截止</b> — 官网活动页只有介绍没有日程表（含进口食品专场对接会、Meat2China 牛肉节场次）。进展馆先去服务台要《会刊 / 展会日程表》。</div>'
+    +'<div style="font-size:13px;color:var(--ink-2);line-height:1.55;margin:8px 0"><b>③ 完整展商名录</b> — 中食展官网未公开可下载名录；食餐会只在官网零散推介。两边的完整名单都只能现场拿。</div>'
+    +'<div style="font-size:13px;color:var(--ink-2);line-height:1.55;margin:8px 0"><b>④ 13.2 馆设备展商</b> — 名单完全未公开，你要的冷冻冷藏和分装设备只能现场淘。</div>'
+    +'<div style="font-size:13px;color:var(--ink-2);line-height:1.55;margin:8px 0"><b>⑤ 9/20 食餐会闭馆时间</b> — 主流口径 13:00（12:30 停止入场），另有 14:00 说法。按 13:00 规划。</div>'
+    +'<div style="font-size:13px;color:var(--ink-2);line-height:1.55;margin:8px 0"><b>⑥ 出口资质、MOQ、希腊语标签能力</b> — 公开信息一律查不到，只能现场问或让组委会提前匹配。</div>'
+    +'</div>';
+
   h+='<h2 class="sec">现场速记</h2><textarea data-note="expo_leads" placeholder="来不及填卡片就先记这里"></textarea>';
 
   document.getElementById("v-expo").innerHTML=h;
   const ml=document.getElementById("mailCopy");
   if(ml) ml.onclick=function(){ copyText(mailText(),"邮件已复制，粘到邮件 App 就能发"); };
+  expoRender();
+  const ee2=document.getElementById("expoExp");
+  if(ee2) ee2.onclick=function(){ expoExport(); };
+  const er2=document.getElementById("expoRst");
+  if(er2) er2.onclick=function(){ if(confirm("清掉所有勾选？")) expoReset(); };
   renderVend();
   const vq=document.getElementById("vendQ");
   if(vq) vq.value=vendQ;
