@@ -182,6 +182,10 @@
   .lightbox.on{display:grid}
   .lightbox img{max-width:100%;max-height:88vh;border-radius:10px}
 
+  .foldbar{display:block;width:100%;text-align:left;background:var(--card);border:1px dashed var(--line);
+    border-radius:12px;padding:12px 14px;margin:14px 0 4px;font:inherit;font-size:13.5px;color:var(--mute);cursor:pointer}
+  .foldbar:active{background:var(--indigo-soft)}
+  .foldbar b{color:var(--done)}
   .fab{position:fixed;z-index:60;width:56px;height:56px;border-radius:28px;
     background:var(--indigo);color:#fff;border:0;display:grid;place-items:center;
     box-shadow:0 6px 18px rgba(29,51,48,.3);padding:0;
@@ -358,10 +362,13 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-10.9";
+const BUILD="2026-09-11.1";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-11.1",c:[
+   "★ 已完成默认折叠：每次打开 App 只看没做完的，已完成的不占版面",
+   "顶部按钮变成「显示已完成 N」，底部多了一条「✓ 已完成 N 项 已折叠 · 点开显示」——点任何一处都能展开/收起，展开后能取消打勾"]},
  {v:"2026-09-10.9",c:[
    "★ 证件口径修正（Lee 9/10 说明）：国内一律用身份证——购票/进站/入场都刷身份证，不用护照；护照只用于出入境和值机",
    "9/11 广州南改为「直接刷身份证进闸」，10:30 前到站都够（原按护照人工通道算的时间作废）"]},
@@ -746,7 +753,7 @@ const MEM={};
 let S={done:{},pick:{},notes:{},cards:[],ideas:[]};
 let META={created:0,lastExport:0,restores:[]};
 let SNAPS=[];
-let ready=false, filter="all", hideDone=false, grid=false;
+let ready=false, filter="all", hideDone=true, grid=false;   /* 默认折叠已完成：每次打开都只看没做完的 */
 
 function stripImg(st){
   return {done:st.done,pick:st.pick,notes:st.notes,
@@ -827,7 +834,11 @@ function renderTrip(){
   h+='</div><div class="sechd"><h2>出发前要办完的事</h2><span style="display:flex;gap:6px;align-items:center">'
     +'<button class="addchip" id="mtAdd">＋ 加事</button>'
     +'<button class="chip'+(grid?" on":"")+'" data-grid="1">'+(grid?"单列":"多列")+'</button>'
-    +'<button class="chip'+(hideDone?" on":"")+'" data-hide="1">'+(hideDone?"显示已完成":"隐藏已完成")+'</button></span></div>';
+    +'<button class="chip'+(!hideDone?" on":"")+'" data-hide="1">'+(hideDone?("显示已完成 "+doneN):"隐藏已完成")+'</button></span></div>';
+
+  let doneN=0;
+  PREP.forEach(p=>{ if(S.done[p[0]]) doneN++; });
+  DAYS.forEach(d=>d.items.forEach(i=>{ if(S.done[i[0]]) doneN++; }));
 
   const pv=PREP.filter(p=>pass(p[3],p[0]));
   h+= pv.length ? '<div class="items'+G+'">'+pv.map(p=>row(p[0],"",p[1],p[2],p[3])).join("")+'</div>'
@@ -853,6 +864,11 @@ function renderTrip(){
       +'<div class="mtday" data-mtday="'+d.d+'"></div></div>';
   });
   if(!shown) h+='<div class="empty">这一类没有剩下的事了</div>';
+  if(hideDone&&doneN>0){
+    h+='<button class="foldbar" data-hide="1"><b>✓ 已完成 '+doneN+' 项</b>　已折叠　·　点开显示 / 取消打勾</button>';
+  }else if(!hideDone&&doneN>0){
+    h+='<button class="foldbar" data-hide="1"><b>✓ 已完成 '+doneN+' 项</b>　·　点这里重新折叠</button>';
+  }
   document.getElementById("v-trip").innerHTML=h;
   renderMyTasks();
 }
