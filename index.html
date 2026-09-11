@@ -197,6 +197,18 @@
   .fab.hide{display:none}
   @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
   .fab svg{width:27px;height:27px}
+  .fab.sq{border-radius:15px;background:var(--turmeric);cursor:pointer;touch-action:auto}
+  .fab.sq svg{width:25px;height:25px}
+  .pgrp{font-size:13px;font-weight:700;color:var(--ink);margin:14px 2px 8px;display:flex;align-items:center;gap:6px}
+  .pline{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin:0 0 8px;cursor:pointer;
+    font-size:14px;line-height:1.5}
+  .pline:active{background:var(--indigo-soft)}
+  .pline .pico{flex:none;color:var(--indigo);font-size:15px;padding-left:4px}
+  #promptCard{margin:0 0 12px}
+  #promptCard summary{cursor:pointer;font-weight:700;font-size:14.5px;list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  #promptCard summary::-webkit-details-marker{display:none}
+  #promptCard summary .meta{font-weight:400;font-size:12px;color:var(--mute)}
   .quick{position:fixed;inset:0;z-index:70;display:none}
   .quick.on{display:block}
   .quick .mask{position:absolute;inset:0;background:rgba(20,32,29,.45)}
@@ -344,6 +356,14 @@
   </svg>
 </button>
 
+<button class="fab sq" id="fab2" aria-label="展会谈判提示词" title="展会谈判提示词">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 5.5h16v10.5H9.5L5.5 20v-4H4z" fill="rgba(255,255,255,.2)"/>
+    <path d="M8 9.5h8M8 12.5h5"/>
+  </svg>
+</button>
+
 <div class="quick" id="quick" data-page-node-id="quickSheet01">
   <div class="mask" id="qmask" data-page-node-id="quickMask01"></div>
   <div class="sheet" data-page-node-id="quickBody01">
@@ -355,6 +375,19 @@
       <button class="ghost" id="qpic" data-page-node-id="quickPic001">拍照 / 选图</button>
       <button class="ghost" id="qcancel" data-page-node-id="quickCan001">取消</button>
       <button class="scanbtn" style="flex:1" id="qsave" data-page-node-id="quickSave01">存进灵感本</button>
+    </div>
+  </div>
+</div>
+
+<div class="quick" id="psheet">
+  <div class="mask" id="pmask"></div>
+  <div class="sheet">
+    <h4>展会谈判提示词<span>点一句直接复制 · 去微信粘贴或当面照着说</span></h4>
+    <div class="itags" id="pchips"></div>
+    <div id="plist"></div>
+    <div class="qrow">
+      <button class="ghost" id="pcancel">关闭</button>
+      <button class="scanbtn" style="flex:1" id="pquick">谈完了，记进灵感本</button>
     </div>
   </div>
 </div>
@@ -399,10 +432,14 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-11.16";
+const BUILD="2026-09-11.17";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-11.17",c:[
+   "★ 灵感本标签细分菜系：日式 / 韩式 / 中式 / 泰式 / 亚洲融合 / 其他菜系（原「菜品」自动归入其他菜系），加上包装、设备、门头/装修、菜单、其他，共 11 类",
+   "★ 圆形随手记球正下方新增方形浮游按钮（两个球永远上下对齐、拖圆球一起走）：点开「展会谈判提示词」面板，8 类话术按场景分好，点一句直接复制",
+   "★ 灵感页最顶上加「🎯 展会谈判提示词」卡片：开场白 / 出口欧盟 / 产品细节 / 价格起订 / 冷链物流 / 包装标签 / OEM 贴牌 / 收尾要资料，逛展时展开照着问"]},
  {v:"2026-09-11.16",c:[
    "★ 修复食餐会入场二维码：之前嵌进去的图是裁坏的（缺左上定位角，闸机扫不出）——已从原始确认函重新精确裁剪替换，扫码实测解码一致",
    "签到码更正为 21 位：311011223048371909244（之前少写了结尾一个 4；凭证区、作战清单、二维码说明三处同步改）"]},
@@ -893,7 +930,7 @@ const K_STATE="leetrip.state.v1";
 const K_SNAPS="leetrip.snaps.v1";
 const K_META ="leetrip.meta.v1";
 const MAX_SNAPS=40, MAX_CARDS=40, MAX_IDEAS=60;
-const ITAGS=["菜品","包装","设备","门头/装修","菜单","其他"];
+const ITAGS=["日式","韩式","中式","泰式","亚洲融合","其他菜系","包装","设备","门头/装修","菜单","其他"];
 
 const LS=(()=>{ try{ localStorage.setItem("__probe","1"); localStorage.removeItem("__probe"); return true; }catch(e){ return false; } })();
 const AS=(!LS && typeof window!=="undefined" && window.storage) ? window.storage : null;
@@ -1515,8 +1552,10 @@ function addIdea(img){
   return id;
 }
 function renderIdea(){
+  if(S.ideaTagMig!==1){ (S.ideas||[]).forEach(x=>{ if(x.tag==="菜品") x.tag="其他菜系"; }); S.ideaTagMig=1; save(); }
   const live=S.ideas.filter(x=>!x.hidden);
-  let h='<div class="banner ok"><b>看到什么就扔进来</b><br>逛展、下馆子、路过店门口 —— 拍一张或敲一句，回头再整理。'
+  let h='<details class="card" id="promptCard"><summary>🎯 展会谈判提示词<span class="meta">逛展照着问 · 点一句直接复制</span></summary>'+promptListHTML("全部")+'</details>';
+  h+='<div class="banner ok"><b>看到什么就扔进来</b><br>逛展、下馆子、路过店门口 —— 拍一张或敲一句，回头再整理。'
     +'照片压小后存在这台手机里，点照片看大图。导出的文字里没有图，图要靠备份文件带走。</div>';
   h+='<div class="scanbar">'
     +'<button class="scanbtn" id="ipick"><svg viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3.5"/></svg>拍照 / 选图</button>'
@@ -1552,6 +1591,53 @@ function ideaText(){
     +live.map((x,i)=>(i+1)+". ["+(x.tag||"未分类")+"] "+((x.txt&&x.txt.trim())?x.txt:"（只有照片，没写字）")
       +(x.img?"　[附照片]":"")+"　— "+fmt(x.ts)).join("\n");
 }
+
+/* ---------- 展会谈判提示词（2026-09-11 Lee：灵感页置顶 + 方形浮游按钮随时打开） ---------- */
+const PROMPTS=[
+ {g:"开场白",ico:"👋",items:[
+  "老板好，我在希腊开日式拉面店 + 预制菜小店，想找长期供货的工厂，你们主打哪几款？",
+  "我是欧洲餐饮采购，做日式拉面和预制菜连锁。你们家产品有没有销欧洲的？"]},
+ {g:"出口欧盟",ico:"🇪🇺",items:[
+  "能不能出欧盟？做过欧盟客户没有？",
+  "含肉 / 蛋 / 乳的动物源性产品能不能出欧盟？工厂在欧盟注册名单里吗？",
+  "有没有 HACCP / BRC / IFS 认证？能给证书扫描件吗？"]},
+ {g:"产品细节",ico:"🍜",items:[
+  "这款复热后，单份出餐要几分钟？",
+  "能不能按日式餐厅场景做小份、定量、标准化包装？",
+  "完整配料、肉乳蛋含量、过敏原、保质期、储存温度是什么？",
+  "能先寄样品到希腊试菜吗？样品费和运费怎么算？"]},
+ {g:"价格起订",ico:"💰",items:[
+  "MOQ 最小起订量多少？能不能拼柜？",
+  "价格梯度怎么走？月供和年供分别什么价？FOB 报多少？",
+  "含包装的单价比零售价低多少？"]},
+ {g:"冷链物流",ico:"❄️",items:[
+  "储运温度多少？-18℃ 冷冻还是常温？到港后还剩多少货架期？",
+  "常用哪家货代发欧洲？海运到比雷埃夫斯港多久、多少钱？"]},
+ {g:"包装标签",ico:"🏷️",items:[
+  "中文标签改英语 / 希腊语标签，谁来做？改包装成本多少？",
+  "能不能按欧盟 1169/2011 法规印营养成分表和过敏原？"]},
+ {g:"OEM 贴牌",ico:"🏭",items:[
+  "能不能按我的菜单 / 配方 OEM？起订量单独算吗？",
+  "打我自己的牌子，包装谁出？版费 / 模具费多少？"]},
+ {g:"收尾要资料",ico:"🤝",items:[
+  "加个微信，我把采购清单发你，试了样品再谈量。",
+  "发我英文规格书 + 报价单 + 出口文件清单，这周给你答复。"]}
+];
+let pCat="全部";
+const psheet=document.getElementById("psheet");
+function promptListHTML(cat){
+  return PROMPTS.map((g,gi)=>{
+    if(cat&&cat!=="全部"&&cat!==g.g) return "";
+    return '<div class="pgrp">'+g.ico+" "+g.g+"</div>"
+      +g.items.map((p,pi)=>'<div class="pline" data-pcopy="'+gi+"|"+pi+'"><span>'+esc(p)+'</span><b class="pico">⧉</b></div>').join("");
+  }).join("");
+}
+function renderPChips(){
+  const cs=["全部"].concat(PROMPTS.map(g=>g.g));
+  document.getElementById("pchips").innerHTML=cs.map(c=>'<button class="tag'+(pCat===c?" on":"")+'" data-pcat="'+c+'">'+c+"</button>").join("");
+}
+function pOpen(){ renderPChips(); document.getElementById("plist").innerHTML=promptListHTML(pCat); psheet.classList.add("on"); }
+function pClose(){ psheet.classList.remove("on"); }
 
 /* ---------- 灵感总结：可视概览 + 导出 .html 文件（2026-09-11 Lee 要求） ---------- */
 const ideaDay=t=>{const d=new Date(t);return (d.getMonth()+1)+"/"+d.getDate();};
@@ -1995,7 +2081,7 @@ ipicker.addEventListener("change", async e=>{
   }
   if(pickTarget!=="quick") toast("存好了，写两句再走 —— 光有照片过几天就认不出来了");
 });
-document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&quick.classList.contains("on")) qClose(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(quick.classList.contains("on")) qClose(); if(psheet.classList.contains("on")) pClose(); } });
 
 /* ---------- 我加的事：存资料库数据表，手机和电脑实时同步 ---------- */
 const DATABASE_ID="b7pWJF5qPhqUofOD7oqb4p";
@@ -2218,19 +2304,22 @@ const BUYLIST=[
 
 /* 悬浮球：随手拖到哪都行，松手自动贴最近的边，位置记住 */
 const fab=document.getElementById("fab");
+const fab2=document.getElementById("fab2");   /* 方形：展会谈判提示词，永远吊在圆球正下方（2026-09-11） */
 const FKEY="wb-fab-pos-v1";
-const FABW=56, PAD=10;
+const FABW=56, FABGAP=10, PAD=10;
 let fabPos=null;
 try{ fabPos=JSON.parse(localStorage.getItem(FKEY)||"null"); }catch(e){ fabPos=null; }
 function fabBounds(){
   const tabh=parseInt(getComputedStyle(document.documentElement).getPropertyValue("--tabh"))||58;
   return {minX:PAD, maxX:Math.max(PAD,window.innerWidth-FABW-PAD),
-    minY:74, maxY:Math.max(74,window.innerHeight-tabh-FABW-PAD-26)};
+    minY:74, maxY:Math.max(74,window.innerHeight-tabh-FABW*2-FABGAP-PAD-26)};
 }
 function placeFab(p,persist){
   const b=fabBounds();
   const c={x:Math.min(Math.max(b.minX,p.x),b.maxX), y:Math.min(Math.max(b.minY,p.y),b.maxY)};
   fab.style.left=c.x+"px"; fab.style.top=c.y+"px"; fab.style.right="auto"; fab.style.bottom="auto";
+  fab2.style.left=c.x+"px"; fab2.style.top=(c.y+FABW+FABGAP)+"px";
+  fab2.style.right="auto"; fab2.style.bottom="auto";
   fabPos=c;
   if(persist!==false){ try{ localStorage.setItem(FKEY,JSON.stringify(c)); }catch(e){} }
 }
@@ -2406,6 +2495,13 @@ document.addEventListener("click", e=>{
   if(e.target.closest("#qpic")){ ipicker.click(); return; }
   if(e.target.closest("#qmask")||e.target.closest("#qcancel")){ qClose(); return; }
   if(e.target.closest("#qsave")){ qSave(); return; }
+  if(e.target.closest("#fab2")){ pOpen(); return; }
+  if(e.target.closest("#pmask")||e.target.closest("#pcancel")){ pClose(); return; }
+  if(e.target.closest("#pquick")){ pClose(); qOpen(); return; }
+  const pcat=e.target.closest("[data-pcat]");
+  if(pcat){ pCat=pcat.dataset.pcat; renderPChips(); document.getElementById("plist").innerHTML=promptListHTML(pCat); return; }
+  const pcp=e.target.closest("[data-pcopy]");
+  if(pcp){ const pp=pcp.dataset.pcopy.split("|"); copyText(PROMPTS[+pp[0]].items[+pp[1]],"已复制，去微信粘贴或当面照着说"); return; }
   const qt=e.target.closest("[data-qtag]");
   if(qt){ qTag = qTag===qt.dataset.qtag ? "" : qt.dataset.qtag; renderQTags(); return; }
   const qr=e.target.closest("[data-qrm]");
