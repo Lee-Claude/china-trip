@@ -362,10 +362,13 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-11.8";
+const BUILD="2026-09-11.9";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-11.9",c:[
+   "★ 住宿页拆分两个复制按钮：① 对外「采购联络卡」（给供应商/组委会订货用，只含姓名+手机+采购身份，已隐去身份证与住址）② 内部「登记卡」（含证件+住址，标注仅自己填表/打车用、勿外发）",
+   "修复：原一键复制把「身份证（国内登记用）」+ 入住地址一起拷出去，外发给供应商会泄露隐私；现在对外复制彻底不含证件与行程信息"]},
  {v:"2026-09-11.8",c:[
    "★ 展会页顶部新增「🎯 食餐会 9/18–20 作战计划」：北登录厅入口、E2 主攻（湘菜出海专区）、E3/W3/W4 分工、可跳过展馆、9/20 只到 13:00、无电子名录要领纸质图",
    "新增「📧 复制给组委会的需求邮件」：收件人 cfce_hn@163.com，含 5 类采购需求 + 1:5 对接申请，一键复制",
@@ -656,6 +659,10 @@ function mePick(){
   let hit=null; L.forEach(function(x){ if(x.id===sel) hit=x; });
   return hit||L[0];
 }
+function cardBlock(){
+  return ME.name+"　"+ME.phone+"\n"+"希腊雅典餐饮采购商 · 预制菜 / 速冻调理 / 冷链 OEM / 食品出口";
+}
+
 function meBlock(){
   const p=mePick();
   return ME.name+"　"+ME.phone+"\n"+"证件："+ME.id+"\n"+(p?("入住："+p.name+"\n"+p.addr):"");
@@ -946,7 +953,9 @@ function renderTrip(){
 /* ---------- 住宿 ---------- */
 function renderStay(){
   const _p=mePick(), _L=meList();
-  let h='<h2 class="sec">📋 登记信息 · 一键复制</h2><div class="card">'    +'<div style="font-size:15px;line-height:1.95"><b style="font-size:16px">'+esc(ME.name)+'</b>　<span class="num">'+esc(ME.phone)+'</span>'    +'<div style="color:var(--mute);font-size:12.5px">证件：国内用身份证（护照只用于出入境 / 值机）</div></div>'    +'<div style="font-size:12.5px;color:var(--mute);margin:10px 0 5px">用哪个地址？点一下切换</div>'    +'<div class="chips">'+_L.map(function(x){ return '<button class="chip'+(_p&&x.id===_p.id?' on':'')+'" data-mestay="'+x.id+'">'+esc(x.name.replace(/✓已订/,''))+'</button>'; }).join('')+'</div>'    +(_p?('<div style="margin-top:9px;font-size:14px;line-height:1.7"><b>'+esc(_p.name)+'</b><div style="color:var(--ink-2)">'+esc(_p.addr)+'</div></div>'):'')    +'<button class="ghost wide" id="meCopy" style="margin-top:10px">📋 复制姓名 + 手机 + 地址</button>'    +'<p style="font-size:12px;color:var(--mute);margin:6px 0 0">默认选中「今晚能入住」那家；要用别家点上面的按钮。</p></div>';
+  let h='<h2 class="sec">📋 对外 · 采购联络卡（给供应商 / 组委会订货对接）</h2><div class="card">'+'<div style="font-size:15px;line-height:1.95"><b style="font-size:16px">'+esc(ME.name)+'</b>　<span class="num">'+esc(ME.phone)+'</span></div>'+'<div style="font-size:13px;color:var(--ink-2);margin-top:7px;line-height:1.6">希腊雅典餐饮采购商 · 预制菜 / 速冻调理 / 冷链 OEM / 食品出口</div>'+'<button class="ghost wide" id="meCopyCard" style="margin-top:12px">📋 复制采购联络卡（已隐去证件与住址）</button>'+'<p style="font-size:12px;color:var(--mute);margin:7px 0 0">只含姓名 + 手机 + 采购身份，可直接发给供应商订货、填对接表，<b>不含任何私人信息</b>。</p></div>';
+
+ h+='<h2 class="sec">🏠 内部 · 登记卡（仅自己填表 / 打车用，勿外发）</h2><div class="card">'+'<div style="font-size:15px;line-height:1.95"><b style="font-size:16px">'+esc(ME.name)+'</b>　<span class="num">'+esc(ME.phone)+'</span>'+'<div style="color:var(--mute);font-size:12.5px">证件：国内用身份证（护照只用于出入境 / 值机）</div></div>'+'<div style="font-size:12.5px;color:var(--mute);margin:10px 0 5px">用哪个地址？点一下切换</div>'+'<div class="chips">'+_L.map(function(x){ return '<button class="chip'+(_p&&x.id===_p.id?' on':'')+'" data-mestay="'+x.id+'">'+esc(x.name.replace(/✓已订/,''))+'</button>'; }).join('')+'</div>'+(_p?('<div style="margin-top:9px;font-size:14px;line-height:1.7"><b>'+esc(_p.name)+'</b><div style="color:var(--ink-2)">'+esc(_p.addr)+'</div></div>'):'')+'<button class="ghost wide" id="meCopyReg" style="margin-top:10px">📋 复制登记卡（含证件 + 住址，仅自用）</button>'+'<p style="font-size:12px;color:var(--mute);margin:6px 0 0">默认选中「今晚能入住」那家；要用别家点上面的按钮。<b>切勿发给外部。</b></p></div>';
 
   h+='<h2 class="sec">🎫 已订凭证（订单号都在这）</h2><div class="card">'
   +VOUCH.map(v=>'<div class="zrow" style="align-items:flex-start"><span style="flex:0 0 auto;font-size:11.5px;font-weight:640;color:'+(v.s==="✓已订"?"var(--done)":"var(--turmeric)")+'">'+esc(v.s)+'</span>'
@@ -973,8 +982,10 @@ function renderStay(){
       +'<textarea data-note="hn_'+s.id+'" placeholder="携程查到多少、订的哪家、确认号、能不能免费取消"></textarea></div></div>';
   });
   document.getElementById("v-stay").innerHTML=h;
-  const mc=document.getElementById("meCopy");
-  if(mc) mc.onclick=function(){ copyText(meBlock(),"已复制：姓名 + 手机 + 地址"); };
+  const mc=document.getElementById("meCopyCard");
+  if(mc) mc.onclick=function(){ copyText(cardBlock(),"已复制：采购联络卡（已隐去证件与住址）"); };
+  const mr=document.getElementById("meCopyReg");
+  if(mr) mr.onclick=function(){ copyText(meBlock(),"已复制：登记卡（含证件与住址，仅自己填表用）"); };
   document.querySelectorAll("[data-mestay]").forEach(function(b){
     b.onclick=function(){ S.meStayId=b.getAttribute("data-mestay"); save(); renderStay(); };
   });
