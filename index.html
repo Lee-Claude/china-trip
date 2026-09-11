@@ -362,10 +362,12 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-11.1";
+const BUILD="2026-09-11.2";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-11.2",c:[
+   "🐛 修复「打开一直卡在载入中」：折叠功能的统计变量 doneN 声明位置在使用之后，抛 ReferenceError 导致整个页面打不开（上一版 09-11.1 的严重 bug）"]},
  {v:"2026-09-11.1",c:[
    "★ 已完成默认折叠：每次打开 App 只看没做完的，已完成的不占版面",
    "顶部按钮变成「显示已完成 N」，底部多了一条「✓ 已完成 N 项 已折叠 · 点开显示」——点任何一处都能展开/收起，展开后能取消打勾"]},
@@ -826,6 +828,10 @@ function renderTrip(){
   PREP.forEach(p=>bump(p[3],p[0]));
   DAYS.forEach(d=>d.items.forEach(i=>bump(i[4],i[0])));
 
+  let doneN=0;                                  /* 已完成数量：供顶部按钮和底部折叠条使用，必须在用之前声明 */
+  PREP.forEach(p=>{ if(S.done[p[0]]) doneN++; });
+  DAYS.forEach(d=>d.items.forEach(i=>{ if(S.done[i[0]]) doneN++; }));
+
   let h='<div class="chips"><button class="chip'+(filter==="all"?" on":"")+'" data-f="all">全部<b>'+counts.all+'</b></button>';
   Object.keys(CATS).forEach(k=>{
     h+='<button class="chip'+(filter===k?" on":"")+'" data-f="'+k+'">'+CATS[k]+'<b>'+(counts[k]||0)+'</b></button>';
@@ -835,10 +841,6 @@ function renderTrip(){
     +'<button class="addchip" id="mtAdd">＋ 加事</button>'
     +'<button class="chip'+(grid?" on":"")+'" data-grid="1">'+(grid?"单列":"多列")+'</button>'
     +'<button class="chip'+(!hideDone?" on":"")+'" data-hide="1">'+(hideDone?("显示已完成 "+doneN):"隐藏已完成")+'</button></span></div>';
-
-  let doneN=0;
-  PREP.forEach(p=>{ if(S.done[p[0]]) doneN++; });
-  DAYS.forEach(d=>d.items.forEach(i=>{ if(S.done[i[0]]) doneN++; }));
 
   const pv=PREP.filter(p=>pass(p[3],p[0]));
   h+= pv.length ? '<div class="items'+G+'">'+pv.map(p=>row(p[0],"",p[1],p[2],p[3])).join("")+'</div>'
