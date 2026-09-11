@@ -289,6 +289,10 @@
   .xcheck.on{color:var(--mute);text-decoration:line-through}
   .xcheck .sub{display:block;font-size:12.5px;color:var(--mute);margin-top:2px}
   .mapline b{color:var(--turmeric)}
+  .mapchip{display:inline-flex;align-items:center;gap:4px;margin:5px 14px 0;font-size:12.5px;font-weight:600;
+    color:var(--indigo);background:var(--indigo-soft);border:1px solid #C9D6E4;border-radius:14px;
+    padding:4px 12px;text-decoration:none;line-height:1.3}
+  .items.grid .mapchip{margin:0;border-radius:10px;font-size:11px;padding:4px 8px;justify-self:start}
 
   /* 灵感总结（2026-09-11 Lee 要的可视总结 + 导出文件） */
   .sumbox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 14px}
@@ -395,13 +399,16 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-11.14";
+const BUILD="2026-09-11.15";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-11.15",c:[
+   "★ 行程页凡是有地址的条目（11 处）都加了「📍 高德/Google 导航」小胶囊：点一下直接跳地图，中国地址走高德、境外地址走 Google",
+   "费用页课程条目价格归位：濑户料理学院 寿司+刺身（6天）总价 ¥5980，备注「自付 4000 · 合伙人 1980」（老设备自动从 5908 迁移回 5980）"]},
  {v:"2026-09-11.14",c:[
    "课程页新增「寿司课程安排（6 天）」折叠卡：每天上午/下午学什么、9:30–12:00 / 14:00–18:00、穿校服、9500 套餐主食课怎么约（源自《寿司行程计划安排表.pdf》）",
-   "费用页课程条目更正：濑户料理学院 寿司+刺身（6天）总价改为 ¥5908，备注「自付 4000 · 合伙人 1908」（老设备自动迁移，不动其它条目）",
+   "费用页课程条目补充上课日期与备注（金额以 .15 的 ¥5980 为准）",
    "灵感导出的总结文件升级为「一份文件两种读法」：可视版给人看，另附纯文本清单 + JSON 数据块给 AI/程序直接读"]},
  {v:"2026-09-11.13",c:[
    "★ 灵感页新增「📊 总结灵感」：一键生成可视概览（条数/带照片/有文字 KPI + 按标签分布条 + 按日期分布条 + 分标签要点），并可直接导出「灵感总结.html」文件（自包含、带照片、双击即可阅读）",
@@ -598,23 +605,23 @@ const DAYS=[
   ["d0909","17:00","机场快线 → 九龙站","约 21 分钟","move"],
   ["d0910","17:40","到香港西九龙高铁站","一地两检，站内办内地入境，预留 60 分钟","move"],
   ["d0911","18:40","高铁 → 广州南（✓已购 ¥213.38）","港铁扣款实付 ¥213.38；到广州南约 20:00，回琶洲酒店（新港东路 37 号）休息","move"],
-  ["d0912","20:45","入住琶洲酒店","","hotel"],
+  ["d0912","20:45","入住琶洲酒店","","hotel","海珠区新港东路 37 号"],
   ["d0913","21:30","确认中食展电子门票和明天的动线","","expo"]]},
  {d:"9/10",w:"周四",tag:"中食展 D1",items:[
-  ["d1001","08:15","出发去广交会展馆 B 区","海珠区阅江中路 382 号，地铁 8/11 号线琶洲站","move"],
+  ["d1001","08:15","出发去广交会展馆 B 区","海珠区阅江中路 382 号，地铁 8/11 号线琶洲站","move","海珠区阅江中路 382 号"],
   ["d1002","09:00","入场，凭护照原件刷闸机","","expo"],
   ["d1003","上午","食材及调味料专馆","冷冻品、水产、肉禽、调味品、复合调味料 —— 主战场","expo"],
   ["d1004","下午","肉类冻品区 + Meat2China 牛肉节","顺便摸冷链成本和运输条件","expo"],
   ["d1005","17:00","闭馆，当晚把名片扫进「展会」页","","expo"]]},
  {d:"9/11",w:"周五",tag:"提前离展 · 转长沙",hot:true,items:[
-  ["d1101","08:45","退房（琶洲酒店），行李随身带走","不进展馆了——F2C 出口型供应商太少，把力气留给长沙食餐会（9/18–20）","hotel"],
-  ["d1102","09:00","去广州南（★打车 or 地铁，二选一）","打车：约 25–28 公里，35–45 分钟、¥70–100，9:45 出门也来得及。地铁：磨碟沙 B 口（酒店步行 330 米）→ 8 号线（滘心方向）6 站到昌岗 → 换 2 号线（广州南站方向）8 站到广州南站，全程 45–55 分钟，9:00 前出门。到站后<b>直接刷身份证进闸</b>（身份证买的票，不用人工通道），10:30 前到都够，保守按 10:00–10:15 到","move"],
+  ["d1101","08:45","退房（琶洲酒店），行李随身带走","不进展馆了——F2C 出口型供应商太少，把力气留给长沙食餐会（9/18–20）","hotel","海珠区新港东路 37 号"],
+  ["d1102","09:00","去广州南（★打车 or 地铁，二选一）","打车：约 25–28 公里，35–45 分钟、¥70–100，9:45 出门也来得及。地铁：磨碟沙 B 口（酒店步行 330 米）→ 8 号线（滘心方向）6 站到昌岗 → 换 2 号线（广州南站方向）8 站到广州南站，全程 45–55 分钟，9:00 前出门。到站后<b>直接刷身份证进闸</b>（身份证买的票，不用人工通道），10:30 前到都够，保守按 10:00–10:15 到","move","广州南站"],
   ["d1103","11:11","高铁 G1168 广州南 → 长沙南（✓已改签）","2小时44分，13:55 到长沙南。检票口 8 或 B8（以车站实际为准）；二等座；取票号 EN17319828","move"],
-  ["d1104","13:55","到长沙南 → 林夕居酒店（✓已订）","地铁（约 50 分钟 ¥5）：站内「长沙火车南站」→ 2 号线（龙虎岭方向）11 站到五一广场 → 换 1 号线（金盆丘方向）只 1 站到培元桥 → <b>4 号口</b>出，走约 5 分钟到黄兴北路华润置地中心 T5 栋 106 门面。打车更快：25–30 分钟 ¥30，拖箱子更省事。酒店 14:00 后入住","hotel"],
-  ["d1105","下午","休整 + 踩点料理学院","濑户料理学院：黄兴北路 89 号 上城金都·国际公馆 南栋 1425 室，和酒店同一条街，先认门","cls"],
+  ["d1104","13:55","到长沙南 → 林夕居酒店（✓已订）","地铁（约 50 分钟 ¥5）：站内「长沙火车南站」→ 2 号线（龙虎岭方向）11 站到五一广场 → 换 1 号线（金盆丘方向）只 1 站到培元桥 → <b>4 号口</b>出，走约 5 分钟到黄兴北路华润置地中心 T5 栋 106 门面。打车更快：25–30 分钟 ¥30，拖箱子更省事。酒店 14:00 后入住","hotel","开福区黄兴北路华润置地中心 T5 栋 106 门面"],
+  ["d1105","下午","休整 + 踩点料理学院","濑户料理学院：黄兴北路 89 号 上城金都·国际公馆 南栋 1425 室，和酒店同一条街，先认门","cls","开福区黄兴北路 89 号 上城金都·国际公馆 南栋 1425 室"],
   ["d1106","傍晚","吃点长沙的东西，早点睡","明天开始连续课程（9/12–9/16），保存体力","cls"]]},
   {d:"9/12",w:"周六",tag:"寿司课 D2",items:[
-  ["d1201","08:30","出发去濑户料理学院","开福区黄兴北路 89 号 南栋 1425 室","cls"],
+  ["d1201","08:30","出发去濑户料理学院","开福区黄兴北路 89 号 南栋 1425 室","cls","开福区黄兴北路 89 号 上城金都·国际公馆 南栋 1425 室"],
   ["d1202","09:00","上课","","cls"],
   ["d1203","晚上","写当天笔记","","cls"]]},
  {d:"9/13",w:"周日",tag:"寿司课 D3",items:[
@@ -629,10 +636,10 @@ const DAYS=[
   ["d1603","晚上","写总结笔记","","cls"]]},
  {d:"9/17",w:"周四",tag:"转场",items:[
   ["d1701","上午","休整，整理课程笔记和样品","","cls"],
-  ["d1702","下午","退房，转场到一百米酒店（长沙南站东广场）","市中心地铁 2 号线直达长沙南站；酒店在高铁南站上盖，明天进站零通勤","hotel"],
+  ["d1702","下午","退房，转场到一百米酒店（长沙南站东广场）","市中心地铁 2 号线直达长沙南站；酒店在高铁南站上盖，明天进站零通勤","hotel","雨花区东山街道雨花大道高铁南站东广场北栋一楼"],
   ["d1703","傍晚","踩点北登录厅位置和入口","","expo"]]},
  {d:"9/18",w:"周五",tag:"食餐会 D1",items:[
-  ["d1801","08:45","进馆，先在北登录厅拿平面图","8 万㎡、8 个展馆，不规划动线一天走不完","expo"],
+  ["d1801","08:45","进馆，先在北登录厅拿平面图","8 万㎡、8 个展馆，不规划动线一天走不完","expo","长沙县国展路 118 号 长沙国际会展中心"],
   ["d1802","上午","E2 馆：冷冻肉品 / 海鲜水产 / 湘菜出海专区","先啃最硬的骨头，出口型企业集中在这","expo"],
   ["d1803","下午","E3 馆：餐饮食材 + 速冻加工与包装机械","看完顺路进 W4 看冷链物流","expo"],
   ["d1804","17:00","闭馆，扫名片","","expo"]]},
@@ -654,13 +661,13 @@ const DAYS=[
  {d:"9/23",w:"周三",tag:"返程",hot:true,items:[
   ["d2301","09:30","退房","","hotel"],
   ["d2302","11:30","出发去香港（另行安排）","不用订高铁票，Lee 另有办法回香港","move"],
-  ["d2303","13:00","九龙站转机场快线","","move"],
+  ["d2303","13:00","九龙站转机场快线","","move","香港西九龙站"],
   ["d2304","14:00","到 HKG T1","","move"],
   ["d2305","15:45","完成值机","越航手提 + 个人物品总重 ≤ 10kg，56×36×23cm","move"],
   ["d2306","18:45","VN595 起飞 · 香港 → 胡志明","","move"],
   ["d2307","23:00","VN31 起飞 · 胡志明 → 法兰克福","行李直挂法兰克福","move"]]},
  {d:"9/24",w:"周四",tag:"到家",items:[
-  ["d2401","06:30","落地 FRA T3","","move"]]}
+  ["d2401","06:30","落地 FRA T3","","move","Frankfurt Airport Terminal 3"]]}
 ];
 
 const MAIL={
@@ -718,22 +725,27 @@ function meBlock(){
   return ME.name+"　"+ME.phone+"\n"+(p?(p.name.replace(/✓已订/,"")+"\n"+p.addr):"");
 }
 
-/* 地图按钮：中国地址→高德地图（自动定位、自己选出行方式），海外地址→Google 地图。
-   手机上点一下直接跳对应 App / 网页（2026-09-11 Lee 要求加在住宿页） */
+/* 地图导航：中国地址→高德地图（自动定位、自己选出行方式），海外地址→Google 地图。
+   手机上点一下直接跳对应 App / 网页。
+   mapBtn = 住宿页用的大按钮；mapChip = 行程页地址条目后面跟的小胶囊（2026-09-11 加） */
+function isChinaAddr(addr){
+  const clean=String(addr||"").replace(/[（(].*?[)）]/g,"").replace(/\s+/g," ").trim();
+  return /[一-龥]/.test(clean) && /(省|市|区|县|路|大道|街|镇|村|号|栋|广场|地铁|街道|新村|花园|站|机场)/.test(clean);
+}
 function mapHref(addr){
-  const clean=addr.replace(/[（(].*?[)）]/g,"").replace(/\s+/g," ").trim();
-  const cn=/[一-龥]/.test(clean) && /(省|市|区|县|路|大道|街|镇|村|号|栋|广场|地铁|街道|新村|花园)/.test(clean);
-  return cn
+  const clean=String(addr||"").replace(/[（(].*?[)）]/g,"").replace(/\s+/g," ").trim();
+  return isChinaAddr(addr)
     ? "https://uri.amap.com/search?keyword="+encodeURIComponent(clean)
     : "https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(clean);
 }
 function mapBtn(addr){
   if(!addr||addr==="—") return "";
-  const u=mapHref(addr);
-  const cn=/[一-龥]/.test(addr.replace(/[（(].*?[)）]/g,"").replace(/\s+/g," ").trim())
-    && /(省|市|区|县|路|大道|街|镇|村|号|栋|广场|地铁|街道|新村|花园)/.test(addr);
-  return '<a class="ghost wide" href="'+u+'" target="_blank" rel="noopener"'
-    +' style="margin-top:10px;text-decoration:none;display:block;text-align:center">📍 打开地图（'+(cn?"高德":"Google")+'）导航到这个地址</a>';
+  return '<a class="ghost wide" href="'+mapHref(addr)+'" target="_blank" rel="noopener"'
+    +' style="margin-top:10px;text-decoration:none;display:block;text-align:center">📍 打开地图（'+(isChinaAddr(addr)?"高德":"Google")+'）导航到这个地址</a>';
+}
+function mapChip(addr){
+  if(!addr||addr==="—") return "";
+  return '<a class="mapchip" href="'+mapHref(addr)+'" target="_blank" rel="noopener">📍 '+(isChinaAddr(addr)?"高德":"Google")+' 导航</a>';
 }
 
 const VOUCH=[
@@ -1006,7 +1018,7 @@ function renderTrip(){
       +'<span class="dtag'+(d.hot?" hot":"")+'">'+esc(d.tag)+'</span>'
       +'<button class="addchip" data-dayadd="'+d.d+'" style="margin-left:auto">＋</button></div>'
       +(QRDAY[d.d]?qrCard(QRDAY[d.d]):"")
-      +'<div class="items'+G+'">'+vis.map(i=>row(i[0],i[1],i[2],i[3],i[4])).join("")+'</div>'
+      +'<div class="items'+G+'">'+vis.map(i=>row(i[0],i[1],i[2],i[3],i[4])+(i[5]?mapChip(i[5]):"")).join("")+'</div>'
       +'<div class="mtday" data-mtday="'+d.d+'"></div></div>';
   });
   if(!shown) h+='<div class="empty">这一类没有剩下的事了</div>';
@@ -1672,7 +1684,7 @@ function renderNote(){
     +COURSE.map(c=>'<div style="margin:11px 0 0"><b style="font-size:13.5px">'+esc(c.d)+'</b>'
       +'<div style="font-size:12.5px;color:var(--ink-2);line-height:1.55;margin-top:3px"><b style="color:var(--indigo)">上午</b> '+esc(c.am)+'</div>'
       +'<div style="font-size:12.5px;color:var(--ink-2);line-height:1.55;margin-top:3px"><b style="color:var(--indigo)">下午</b> '+esc(c.pm)+'</div></div>').join("")
-    +'<p style="font-size:12px;color:var(--mute);margin:12px 0 0;line-height:1.5">穿校服；课程可能按实际进度调整。做好笔记：<b>开店要用的工具规格 / 尺寸 / 品牌</b>，别到开店时不知道怎么买。贵重物品自己保管（可放柜子）。<b>9500 套餐</b>：寿司 6 天学完后，提前一天找王老师 / 刘老师约剩下的 4 天主食课。课程总价 <b>¥5908</b>（自付 ¥4000，合伙人 ¥1908）。</p>'
+    +'<p style="font-size:12px;color:var(--mute);margin:12px 0 0;line-height:1.5">穿校服；课程可能按实际进度调整。做好笔记：<b>开店要用的工具规格 / 尺寸 / 品牌</b>，别到开店时不知道怎么买。贵重物品自己保管（可放柜子）。<b>9500 套餐</b>：寿司 6 天学完后，提前一天找王老师 / 刘老师约剩下的 4 天主食课。课程总价 <b>¥5980</b>（自付 ¥4000，合伙人 ¥1980）。</p>'
     +'</details>';
   NOTES.forEach(n=>{
     h+='<div style="margin-bottom:16px"><div class="nlab"><b>'+esc(n[1])+'</b>'+(n[3]?'<span>'+esc(n[3])+'</span>':"")+'</div>'
@@ -2263,7 +2275,7 @@ const ESEED=[
  {c:"其他",n:"携程全能保障服务",a:44,d:"9/20",p:"出票中"},
  {c:"住宿",n:"林夕居酒店 9/11-9/17（6晚）",a:1056.12,d:"9/11",p:"已付"},
  {c:"住宿",n:"一百米酒店 9/17-9/20（3晚）",a:627,d:"9/17",p:"已付"},
- {c:"课程",n:"濑户料理学院 寿司+刺身（6天）",a:5908,d:"9/12",p:"自付 4000 · 合伙人 1908"},
+ {c:"课程",n:"濑户料理学院 寿司+刺身（6天）",a:5980,d:"9/12",p:"自付 4000 · 合伙人 1980"},
  {c:"门票",n:"中食展 F2C（免费领）",a:0,d:"9/10",p:"免费"},
  {c:"门票",n:"食餐会（预登记免票）",a:0,d:"9/18",p:"免费"},
  {c:"交通",n:"香港机场 → 西九龙（机场快线）",a:98.55,d:"9/9",p:"已付"},
@@ -2283,16 +2295,16 @@ function expSeed(){
   S.exp=keep.concat(ESEED.map(function(x,i){ return {id:"e0_"+i,c:x.c,n:x.n,a:x.a,d:x.d,p:x.p,ts:i,seed:1}; }));
   S.expSeeded=SEED_VER; if(!S.rate) S.rate=7.8; save();
 }
-/* 一次性迁移：把种子里的课程条目从旧价 5980 改为 5908（2026-09-11 Lee 更正：总价 5908、自付 4000）
-   只改这一条、不动其它条目、不复活被删掉的种子，跑一次即止 */
+/* 一次性迁移：课程条目价格归位（2026-09-11 Lee 二次更正：总价 5980、自付 4000、合伙人 1980）
+   .11 版写过的 5908 已作废，这里把老设备上的 5908 改回 5980；只改这一条、不动其它条目、跑一次即止 */
 function expMig(){
-  if(S.expMig11===1) return;
+  if(S.expMig12===1) return;
   (S.exp||[]).forEach(function(x){
-    if(x.seed && x.c==="课程" && Math.abs((+x.a||0)-5980)<0.6){
-      x.a=5908; x.n="濑户料理学院 寿司+刺身（6天）"; x.p="自付 4000 · 合伙人 1908";
+    if(x.seed && x.c==="课程" && Math.abs((+x.a||0)-5908)<0.6){
+      x.a=5980; x.p="自付 4000 · 合伙人 1980";
     }
   });
-  S.expMig11=1; save();
+  S.expMig12=1; S.expMig11=1; save();
 }
 function renderExp(){
   if(!Array.isArray(S.exp)) S.exp=[];
