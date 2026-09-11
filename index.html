@@ -395,10 +395,14 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-11.13";
+const BUILD="2026-09-11.14";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-11.14",c:[
+   "课程页新增「寿司课程安排（6 天）」折叠卡：每天上午/下午学什么、9:30–12:00 / 14:00–18:00、穿校服、9500 套餐主食课怎么约（源自《寿司行程计划安排表.pdf》）",
+   "费用页课程条目更正：濑户料理学院 寿司+刺身（6天）总价改为 ¥5908，备注「自付 4000 · 合伙人 1908」（老设备自动迁移，不动其它条目）",
+   "灵感导出的总结文件升级为「一份文件两种读法」：可视版给人看，另附纯文本清单 + JSON 数据块给 AI/程序直接读"]},
  {v:"2026-09-11.13",c:[
    "★ 灵感页新增「📊 总结灵感」：一键生成可视概览（条数/带照片/有文字 KPI + 按标签分布条 + 按日期分布条 + 分标签要点），并可直接导出「灵感总结.html」文件（自包含、带照片、双击即可阅读）",
    "★ 展会作战清单：已办完的三项默认打勾 —— 中食展观众预登记、食餐会观众预登记、给组委会发需求邮件（默认勾选，可手动取消）",
@@ -1618,12 +1622,17 @@ function ideaSummaryExport(){
   const cnt={}; ITAGS.forEach(t=>cnt[t]=D.byTag[t]); if(D.untagged) cnt["未分类"]=D.untagged;
   const tmax=Math.max(1,...tags.map(t=>cnt[t]));
   const days=Object.keys(D.byDay).sort(), dmax=Math.max(1,...days.map(d=>D.byDay[d]));
+  const sorted=live.slice().sort((a,b)=>b.ts-a.ts);
   let cards="";
-  live.slice().sort((a,b)=>b.ts-a.ts).forEach(x=>{
+  sorted.forEach(x=>{
     cards+='<div class="it">'+(x.img?'<img src="'+x.img+'" alt="">':'')
       +'<div><div class="meta">'+esc(x.tag||"未分类")+' · '+fmt(x.ts)+'</div>'
       +'<div class="tx">'+((x.txt&&x.txt.trim())?esc(x.txt).replace(/\n/g,"<br>"):'<span style="color:#9AA5A1">（只有照片，没写字）</span>')+'</div></div></div>';
   });
+  /* 同一份文件里塞两套：给人看的是上面可视版；给 AI（或任何程序）读的是下面纯文本清单 + JSON 数据块 */
+  const textLines=sorted.map((x,i)=>(i+1)+". ["+(x.tag||"未分类")+"] "+((x.txt&&x.txt.trim())?x.txt.trim():"（只有照片，没写字）")+(x.img?"　[有照片]":"")+"　— "+fmt(x.ts)).join("\n");
+  const data={generated:new Date().toISOString(),build:BUILD,count:live.length,withImg:D.withImg,withTxt:D.withTxt,
+    byTag:cnt,ideas:sorted.map(x=>({tag:x.tag||"",ts:x.ts,time:fmt(x.ts),text:(x.txt||"").trim(),hasImg:!!x.img}))};
   const doc='<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
     +'<meta name="viewport" content="width=device-width,initial-scale=1"><title>灵感总结 · 中国行程</title>'
     +'<style>'+IDEA_REPORT_CSS+'</style></head><body><div class="wrap">'
@@ -1635,6 +1644,9 @@ function ideaSummaryExport(){
     +'<h2>按标签分布</h2>'+tags.map(t=>ideaBar(t,cnt[t],tmax)).join("")
     +'<h2>按日期分布</h2>'+days.map(d=>ideaBar(d,D.byDay[d],dmax)).join("")
     +'<h2>全部灵感（新 → 旧）</h2>'+cards
+    +'<h2>纯文本清单（人和 AI 都能直接读）</h2>'
+    +'<pre id="wb-idea-text" style="white-space:pre-wrap;word-break:break-word;background:#fff;border:1px solid #D2DAD5;border-radius:10px;padding:12px;font-size:13px;line-height:1.6">'+esc(textLines)+'</pre>'
+    +'<script type="application/json" id="wb-idea-data">'+JSON.stringify(data).replace(/</g,"\\u003c")+'<\/script>'
     +'</div></body></html>';
   const blob=new Blob([doc],{type:"text/html;charset=utf-8"});
   const url=URL.createObjectURL(blob), a=document.createElement("a");
@@ -1645,8 +1657,23 @@ function ideaSummaryExport(){
 }
 
 /* ---------- 课程 ---------- */
+/* 寿司课程 6 天安排（源自 Lee 9/11 发的《寿司行程计划安排表.pdf》课程表） */
+const COURSE=[
+ {d:"第一天 · 基础训练",am:"工具介绍与选购 · 食材分类与保存 · 鳗鱼切片 · 米的选择 / 煮饭 / 拌饭 · 寿司醋调制 · 刀工练习与备料 · 海苔的介绍与选择",pm:"细卷 / 水滴卷 · 太卷 · 手卷（食材搭配）制作与练习"},
+ {d:"第二天 · 卷物",am:"自己煮饭拌醋 · 沙拉酱详解与制作 · 鳗鱼汁详解与制作 · 下午材料备料 · 反卷手法练习 · 食材介绍与推荐",pm:"反卷练习：三文鱼奶酪卷 / 香芒反卷 / 寿司挞 / 培根三文鱼卷 · 摆盘"},
+ {d:"第三天 · 卷物（美式）",am:"美式辣酱、焗酱调制 · 煮饭拌饭与食材备料 · 炸虾准备 · 软壳蟹的准备与选择",pm:"美式寿司食材搭配与配色技巧 · 反卷手法练习 · 制作：天妇罗软壳蟹卷 / 牛油果炸虾反卷 / 鳗鱼彩虹反卷 / 焗卷 · 摆盘装饰"},
+ {d:"第四天 · 江户派手握",am:"寿司饭的准备与制作 · 食材准备 · 鲜虾挑选与处理 · 磨刀讲解与练习 · 手握摆盘装饰",pm:"手握制作（三文鱼 / 金枪鱼 / 寿司虾 / 鹅肝 / 榴莲等）· 饭团标准 · 手握技巧与正确方式 · 食材选择"},
+ {d:"第五天 · 刺身",am:"食材准备 · 盘饰准备 · 刺身酱油调配 · 杀草鱼 · 白萝卜丝备料 · 调制芥末 · 刺身制作",pm:"刺身讲解（料理店常用鱼、如何定价）· 各部位处理 · 每人杀半条三文鱼（仅限一次）· 三文鱼挑选与保存 · 花之恋 / 三文鱼分解 · 刺身盘饰与拼盘"},
+ {d:"第六天 · 收尾",am:"玉子烧讲解与制作 · 食材准备",pm:"军舰寿司制作与练习 · 腐皮寿司制作 · 食材总结 · 复习 · 学员答疑与针对性练习"}
+];
 function renderNote(){
   let h='<div class="banner ok"><b>写完就存</b><br>停止输入半秒后自动保存到这台设备，并每 5 分钟留一个可回滚的存档点。</div>';
+  h+='<details class="card" style="margin-bottom:14px"><summary style="cursor:pointer;font-size:14.5px;font-weight:640">📋 寿司课程安排（6 天 · 上午 9:30–12:00 / 下午 14:00–18:00）· 点开看每天学什么</summary>'
+    +COURSE.map(c=>'<div style="margin:11px 0 0"><b style="font-size:13.5px">'+esc(c.d)+'</b>'
+      +'<div style="font-size:12.5px;color:var(--ink-2);line-height:1.55;margin-top:3px"><b style="color:var(--indigo)">上午</b> '+esc(c.am)+'</div>'
+      +'<div style="font-size:12.5px;color:var(--ink-2);line-height:1.55;margin-top:3px"><b style="color:var(--indigo)">下午</b> '+esc(c.pm)+'</div></div>').join("")
+    +'<p style="font-size:12px;color:var(--mute);margin:12px 0 0;line-height:1.5">穿校服；课程可能按实际进度调整。做好笔记：<b>开店要用的工具规格 / 尺寸 / 品牌</b>，别到开店时不知道怎么买。贵重物品自己保管（可放柜子）。<b>9500 套餐</b>：寿司 6 天学完后，提前一天找王老师 / 刘老师约剩下的 4 天主食课。课程总价 <b>¥5908</b>（自付 ¥4000，合伙人 ¥1908）。</p>'
+    +'</details>';
   NOTES.forEach(n=>{
     h+='<div style="margin-bottom:16px"><div class="nlab"><b>'+esc(n[1])+'</b>'+(n[3]?'<span>'+esc(n[3])+'</span>':"")+'</div>'
       +'<textarea data-note="'+n[0]+'" placeholder="'+esc(n[2]||"记点什么…")+'"></textarea></div>';
@@ -2236,7 +2263,7 @@ const ESEED=[
  {c:"其他",n:"携程全能保障服务",a:44,d:"9/20",p:"出票中"},
  {c:"住宿",n:"林夕居酒店 9/11-9/17（6晚）",a:1056.12,d:"9/11",p:"已付"},
  {c:"住宿",n:"一百米酒店 9/17-9/20（3晚）",a:627,d:"9/17",p:"已付"},
- {c:"课程",n:"濑户料理学院 寿司+刺身",a:5980,d:"9/12",p:"待确认"},
+ {c:"课程",n:"濑户料理学院 寿司+刺身（6天）",a:5908,d:"9/12",p:"自付 4000 · 合伙人 1908"},
  {c:"门票",n:"中食展 F2C（免费领）",a:0,d:"9/10",p:"免费"},
  {c:"门票",n:"食餐会（预登记免票）",a:0,d:"9/18",p:"免费"},
  {c:"交通",n:"香港机场 → 西九龙（机场快线）",a:98.55,d:"9/9",p:"已付"},
@@ -2256,9 +2283,20 @@ function expSeed(){
   S.exp=keep.concat(ESEED.map(function(x,i){ return {id:"e0_"+i,c:x.c,n:x.n,a:x.a,d:x.d,p:x.p,ts:i,seed:1}; }));
   S.expSeeded=SEED_VER; if(!S.rate) S.rate=7.8; save();
 }
+/* 一次性迁移：把种子里的课程条目从旧价 5980 改为 5908（2026-09-11 Lee 更正：总价 5908、自付 4000）
+   只改这一条、不动其它条目、不复活被删掉的种子，跑一次即止 */
+function expMig(){
+  if(S.expMig11===1) return;
+  (S.exp||[]).forEach(function(x){
+    if(x.seed && x.c==="课程" && Math.abs((+x.a||0)-5980)<0.6){
+      x.a=5908; x.n="濑户料理学院 寿司+刺身（6天）"; x.p="自付 4000 · 合伙人 1908";
+    }
+  });
+  S.expMig11=1; save();
+}
 function renderExp(){
   if(!Array.isArray(S.exp)) S.exp=[];
-  expSeed();
+  expSeed(); expMig();
   const rate=+S.rate||7.8;
   const list=S.exp.slice().sort(function(a,b){ return String(a.d||"").localeCompare(String(b.d||""))||((b.ts||0)-(a.ts||0)); });
   const tot=expTotal();
