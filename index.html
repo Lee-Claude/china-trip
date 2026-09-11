@@ -289,6 +289,25 @@
   .xcheck.on{color:var(--mute);text-decoration:line-through}
   .xcheck .sub{display:block;font-size:12.5px;color:var(--mute);margin-top:2px}
   .mapline b{color:var(--turmeric)}
+
+  /* 灵感总结（2026-09-11 Lee 要的可视总结 + 导出文件） */
+  .sumbox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 14px}
+  .sumkpis{display:flex;gap:10px;margin-bottom:4px}
+  .sumkpi{flex:1;text-align:center;background:var(--indigo-soft);border-radius:11px;padding:11px 6px}
+  .sumkpi b{display:block;font-size:23px;line-height:1.15;color:var(--indigo)}
+  .sumkpi span{font-size:11.5px;color:var(--mute)}
+  .sumh{font-size:13px;font-weight:640;color:var(--ink);margin:15px 0 8px}
+  .ibar{display:flex;align-items:center;gap:8px;margin:6px 0}
+  .ibar .ilab{flex:0 0 70px;font-size:12.5px;color:var(--ink-2);text-align:right}
+  .ibar .itrack{flex:1;height:14px;background:var(--line);border-radius:7px;overflow:hidden}
+  .ibar .itrack i{display:block;height:100%;background:var(--turmeric);border-radius:7px;min-width:2px}
+  .ibar .inum{flex:0 0 24px;font-size:12px;color:var(--mute);text-align:right}
+  .sumgrp{border-top:1px dashed var(--line);padding:9px 0}
+  .sumgrp:first-of-type{border-top:0}
+  .sumgrp b{font-size:13px;color:var(--ink)}
+  .sumgrp ul{margin:5px 0 0;padding-left:17px}
+  .sumgrp li{font-size:12.5px;color:var(--ink-2);line-height:1.5;margin-bottom:3px}
+  .sumgrp .noimg{color:var(--mute)}
 </style>
 </head>
 <body data-page-node-id="npY45ZMLTF5zE2wvEvaGUo">
@@ -376,10 +395,14 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-11.12";
+const BUILD="2026-09-11.13";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-11.13",c:[
+   "★ 灵感页新增「📊 总结灵感」：一键生成可视概览（条数/带照片/有文字 KPI + 按标签分布条 + 按日期分布条 + 分标签要点），并可直接导出「灵感总结.html」文件（自包含、带照片、双击即可阅读）",
+   "★ 展会作战清单：已办完的三项默认打勾 —— 中食展观众预登记、食餐会观众预登记、给组委会发需求邮件（默认勾选，可手动取消）",
+   "行程页分类按钮重排：登记订票 + 住宿 挪到最后（已基本办完），常用的交通/展会/课程/备办放前面"]},
  {v:"2026-09-11.12",c:[
    "★ 住宿页每家酒店加「打开地图」按钮：中国地址跳高德地图（自动定位、自己选出行方式），海外地址跳 Google 地图，手机点一下直达",
    "★ 把「会展作战清单」网页合并进展会页：作战清单（5 组勾选 + 进度条，存在本机刷新不丢，可导出）、食餐会已知展商表、同期活动表、风险与待确认，均并入「展会」页"]},
@@ -949,7 +972,8 @@ function renderTrip(){
   DAYS.forEach(d=>d.items.forEach(i=>{ if(S.done[i[0]]) doneN++; }));
 
   let h='<div class="chips"><button class="chip'+(filter==="all"?" on":"")+'" data-f="all">全部<b>'+counts.all+'</b></button>';
-  Object.keys(CATS).forEach(k=>{
+  /* 顺序：常用在前（交通/展会/课程/备办），登记订票 + 住宿已基本办完，挪到最后（2026-09-11 Lee 要求） */
+  ["move","expo","cls","prep","reg","hotel"].forEach(k=>{
     h+='<button class="chip'+(filter===k?" on":"")+'" data-f="'+k+'">'+CATS[k]+'<b>'+(counts[k]||0)+'</b></button>';
   });
   const G=grid?" grid":"";
@@ -1179,10 +1203,10 @@ function renderVend(){
 const EXPO_GROUPS=[
  {id:"g0",label:"开展前（9/7–9/9）",items:[
    {t:"打 18102214812 确认护照入场",s:"中食展：护照原件能否刷闸机？预登记要不要绑护照号？今天办，别拖"},
-   {t:"中食展观众预登记",s:"去真官网 food2chinaexpo.com（不是 gzfoodexpo.com），或公众号「F2C食品展」"},
-   {t:"食餐会观众预登记",s:"cfce-cn.com → 观众中心 → 观众报名，免费；现场票 9.9 元"},
+   {t:"中食展观众预登记",def:1,s:"✓ 已完成 —— 回执码 8vE0Vi32aX8J（行程页可点二维码放大）。不用再登记"},
+   {t:"食餐会观众预登记",def:1,s:"✓ 已完成 —— 观众签到码 31101122304837190924（行程页可点二维码放大）。不用再登记"},
    {t:"写下希腊店的采购清单",s:"品类 + 大致月用量，一页纸。没有清单，逛展就是瞎逛"},
-   {t:"把采购清单发给食餐会组委会",s:"0731-89700609 廖先生，走 1:5 精准对接，提前匹配展商"},
+   {t:"把采购清单发给食餐会组委会",def:1,s:"✓ 已完成 —— 需求邮件已发给食餐会组委会（0731-89700609 廖先生）"},
    {t:"打印名片 + 公司简介一页纸",s:"现场换名片用；公司简介让对方一眼看懂你是谁、要什么"}
  ]},
  {id:"g1",label:"中食展 F2C（9/10–9/11）",items:[
@@ -1219,11 +1243,12 @@ const EXPO_KEY="wb-expo-checklist-v1";
 let expoDone={};
 try{ expoDone=JSON.parse(localStorage.getItem(EXPO_KEY)||"{}")||{}; }catch(e){ expoDone={}; }
 function expoSave(){ try{ localStorage.setItem(EXPO_KEY,JSON.stringify(expoDone)); }catch(e){} }
+function expoIsOn(g,it,i){ const k=g.id+"-"+i; return expoDone[k]===undefined ? !!it.def : !!expoDone[k]; }
 function expoToggle(cb){
   expoDone[cb.id]=cb.checked; expoSave();
   cb.closest(".xcheck").classList.toggle("on",cb.checked);
   let total=0,ok=0;
-  EXPO_GROUPS.forEach(g=>g.items.forEach((it,i)=>{ total++; if(expoDone[g.id+"-"+i]) ok++; }));
+  EXPO_GROUPS.forEach(g=>g.items.forEach((it,i)=>{ total++; if(expoIsOn(g,it,i)) ok++; }));
   const bar=document.getElementById("expoBar"); if(bar) bar.style.width=(total?Math.round(ok/total*100):0)+"%";
   const lab=document.getElementById("expoCnt"); if(lab) lab.textContent=ok+" / "+total+" 项已勾";
 }
@@ -1234,7 +1259,7 @@ function expoExport(){
   let out="展会作战清单 · 2026年9月\n（来自「中国行程」App · 展会页）\n";
   EXPO_GROUPS.forEach(g=>{
     out+="\n【"+g.label+"】\n";
-    g.items.forEach((it,i)=>{ out+=(expoDone[g.id+"-"+i]?"[x] ":"[ ] ")+it.t+(it.s?"（"+it.s+"）":"")+"\n"; });
+    g.items.forEach((it,i)=>{ out+=(expoIsOn(g,it,i)?"[x] ":"[ ] ")+it.t+(it.s?"（"+it.s+"）":"")+"\n"; });
   });
   copyText(out,"已复制展会作战清单，粘到备忘录或发给 Claude");
 }
@@ -1244,7 +1269,7 @@ function expoRender(){
   EXPO_GROUPS.forEach(g=>{
     html+='<div class="xgrp"><h4>'+esc(g.label)+' <span class="xcnt" id="xc-'+g.id+'"></span></h4><div class="xitems">';
     g.items.forEach((it,i)=>{
-      const id=g.id+"-"+i, on=!!expoDone[id];
+      const id=g.id+"-"+i, on=expoIsOn(g,it,i);
       html+='<label class="xcheck'+(on?" on":"")+'"><input type="checkbox" id="'+id+'"'+(on?" checked":"")
         +' onchange="expoToggle(this)"><span>'+esc(it.t)+(it.s?'<span class="sub">'+esc(it.s)+'</span>':"")+'</span></label>';
     });
@@ -1252,11 +1277,11 @@ function expoRender(){
   });
   box.innerHTML=html;
   EXPO_GROUPS.forEach(g=>{
-    let t=g.items.length,o=0; g.items.forEach((it,i)=>{ if(expoDone[g.id+"-"+i]) o++; });
+    let t=g.items.length,o=0; g.items.forEach((it,i)=>{ if(expoIsOn(g,it,i)) o++; });
     const el=document.getElementById("xc-"+g.id); if(el) el.textContent=o+" / "+t;
   });
   let total=0,ok=0;
-  EXPO_GROUPS.forEach(g=>g.items.forEach((it,i)=>{ total++; if(expoDone[g.id+"-"+i]) ok++; }));
+  EXPO_GROUPS.forEach(g=>g.items.forEach((it,i)=>{ total++; if(expoIsOn(g,it,i)) ok++; }));
   const bar=document.getElementById("expoBar"); if(bar) bar.style.width=(total?Math.round(ok/total*100):0)+"%";
   const lab=document.getElementById("expoCnt"); if(lab) lab.textContent=ok+" / "+total+" 项已勾";
 }
@@ -1479,6 +1504,8 @@ function renderIdea(){
     +'<button class="ghost" id="inew">写一条</button>'
     +'<button class="ghost" id="iexport">导出</button></div>';
 
+  h+='<button class="ghost wide" id="isum" style="margin:0 0 12px">📊 总结灵感（生成可视概览 + 导出文件）</button><div id="ideaSum"></div>';
+
   h+='<div class="sechd"><h2>灵感本'+(live.length?"（"+live.length+"）":"")+'</h2></div>';
   if(!live.length){
     h+='<div class="empty">还是空的。三种用法：<br><b>拍照 / 选图</b> 一次能选多张，每张单独成一条<br>'
@@ -1505,6 +1532,116 @@ function ideaText(){
     +"3）有照片但没写字的，告诉我该补哪些信息才能判断。\n\n"
     +live.map((x,i)=>(i+1)+". ["+(x.tag||"未分类")+"] "+((x.txt&&x.txt.trim())?x.txt:"（只有照片，没写字）")
       +(x.img?"　[附照片]":"")+"　— "+fmt(x.ts)).join("\n");
+}
+
+/* ---------- 灵感总结：可视概览 + 导出 .html 文件（2026-09-11 Lee 要求） ---------- */
+const ideaDay=t=>{const d=new Date(t);return (d.getMonth()+1)+"/"+d.getDate();};
+function ideaSummaryData(){
+  const live=S.ideas.filter(x=>!x.hidden);
+  const byTag={}; ITAGS.forEach(t=>byTag[t]=0);
+  let untagged=0,withImg=0,withTxt=0; const byDay={};
+  live.forEach(x=>{
+    if(x.tag&&ITAGS.indexOf(x.tag)>=0) byTag[x.tag]++; else untagged++;
+    if(x.img)withImg++; if(x.txt&&x.txt.trim())withTxt++;
+    const d=ideaDay(x.ts); byDay[d]=(byDay[d]||0)+1;
+  });
+  return {live,byTag,untagged,withImg,withTxt,byDay};
+}
+function ideaBar(label,count,max){
+  return '<div class="ibar"><span class="ilab">'+esc(label)+'</span><span class="itrack">'
+    +'<i style="width:'+Math.round((count||0)/Math.max(1,max)*100)+'%"></i></span>'
+    +'<span class="inum num">'+(count||0)+'</span></div>';
+}
+function ideaSummaryBody(){
+  const D=ideaSummaryData(), live=D.live;
+  if(!live.length) return '<p class="meta" style="margin:0">灵感本还是空的，先记几条再来总结。</p>';
+  const tags=ITAGS.concat(D.untagged?["未分类"]:[]);
+  const cnt={}; ITAGS.forEach(t=>cnt[t]=D.byTag[t]); if(D.untagged) cnt["未分类"]=D.untagged;
+  const tmax=Math.max(1,...tags.map(t=>cnt[t]));
+  const bars=tags.map(t=>ideaBar(t,cnt[t],tmax)).join("");
+  const days=Object.keys(D.byDay).sort();
+  const dmax=Math.max(1,...days.map(d=>D.byDay[d]));
+  const dbars=days.map(d=>ideaBar(d,D.byDay[d],dmax)).join("");
+  let grp="";
+  tags.forEach(t=>{
+    const arr=live.filter(x=>(x.tag===t)||(t==="未分类"&&!(x.tag&&ITAGS.indexOf(x.tag)>=0)));
+    if(!arr.length) return;
+    grp+='<div class="sumgrp"><b>'+esc(t)+'（'+arr.length+'）</b><ul>'
+      +arr.map(x=>{ const tx=(x.txt&&x.txt.trim())?x.txt.trim():"" ;
+        return '<li>'+(tx?esc(tx):'<span class="noimg">（只有照片，没写字）</span>')+' <span class="num" style="color:var(--mute)">· '+fmt(x.ts)+'</span></li>'; }).join("")
+      +'</ul></div>';
+  });
+  return '<div class="sumkpis">'
+    +'<div class="sumkpi"><b class="num">'+live.length+'</b><span>条灵感</span></div>'
+    +'<div class="sumkpi"><b class="num">'+D.withImg+'</b><span>带照片</span></div>'
+    +'<div class="sumkpi"><b class="num">'+D.withTxt+'</b><span>有文字</span></div></div>'
+    +'<div class="sumh">按标签分布</div>'+bars
+    +'<div class="sumh">按日期分布</div>'+dbars
+    +'<div class="sumh">分标签要点</div>'+grp;
+}
+function ideaSumToggle(){
+  const box=document.getElementById("ideaSum"), btn=document.getElementById("isum"); if(!box) return;
+  if(box.getAttribute("data-on")==="1"){
+    box.innerHTML=""; box.setAttribute("data-on","0");
+    if(btn) btn.textContent="📊 总结灵感（生成可视概览 + 导出文件）";
+    return;
+  }
+  const live=S.ideas.filter(x=>!x.hidden);
+  box.innerHTML='<div class="sumbox">'+ideaSummaryBody()
+    +(live.length?'<button class="ghost wide" id="isumExp" style="margin-top:12px">⬇️ 导出总结文件（.html，双击就能看）</button>':"")
+    +'</div>';
+  box.setAttribute("data-on","1");
+  if(btn) btn.textContent="📊 收起总结";
+  box.scrollIntoView({block:"start"});
+}
+const IDEA_REPORT_CSS=
+"body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;color:#1D3330;background:#F1F4F2;margin:0;padding:28px 16px 70px;line-height:1.6}"
++".wrap{max-width:840px;margin:0 auto}h1{font-size:24px;margin:0 0 4px}"
++".sub{color:#7A8A85;font-size:13px;margin:0 0 8px}"
++"h2{font-size:16px;margin:26px 0 10px;border-left:3px solid #B8801C;padding-left:10px}"
++".kpis{display:flex;gap:10px;margin:14px 0}"
++".kpi{flex:1;background:#fff;border:1px solid #D2DAD5;border-radius:12px;padding:13px;text-align:center}"
++".kpi b{display:block;font-size:26px;color:#2A4C6B}.kpi span{font-size:12px;color:#7A8A85}"
++".ibar{display:flex;align-items:center;gap:8px;margin:6px 0}"
++".ibar .ilab{flex:0 0 80px;font-size:12.5px;text-align:right;color:#41544F}"
++".ibar .itrack{flex:1;height:15px;background:#E2E7E4;border-radius:8px;overflow:hidden}"
++".ibar .itrack i{display:block;height:100%;background:#B8801C;border-radius:8px;min-width:2px}"
++".ibar .inum{flex:0 0 26px;font-size:12px;color:#7A8A85;text-align:right}"
++".it{display:flex;gap:13px;background:#fff;border:1px solid #D2DAD5;border-radius:12px;padding:11px;margin-bottom:10px}"
++".it img{width:132px;height:132px;object-fit:cover;border-radius:9px;flex:0 0 auto;border:1px solid #D2DAD5}"
++".it .meta{font-size:12px;color:#7A8A85;margin-bottom:4px}.it .tx{font-size:14.5px;color:#1D3330}"
++"@media print{body{background:#fff}.it{break-inside:avoid}}";
+function ideaSummaryExport(){
+  const D=ideaSummaryData(), live=D.live;
+  if(!live.length){ toast("灵感本还是空的"); return; }
+  const tags=ITAGS.concat(D.untagged?["未分类"]:[]);
+  const cnt={}; ITAGS.forEach(t=>cnt[t]=D.byTag[t]); if(D.untagged) cnt["未分类"]=D.untagged;
+  const tmax=Math.max(1,...tags.map(t=>cnt[t]));
+  const days=Object.keys(D.byDay).sort(), dmax=Math.max(1,...days.map(d=>D.byDay[d]));
+  let cards="";
+  live.slice().sort((a,b)=>b.ts-a.ts).forEach(x=>{
+    cards+='<div class="it">'+(x.img?'<img src="'+x.img+'" alt="">':'')
+      +'<div><div class="meta">'+esc(x.tag||"未分类")+' · '+fmt(x.ts)+'</div>'
+      +'<div class="tx">'+((x.txt&&x.txt.trim())?esc(x.txt).replace(/\n/g,"<br>"):'<span style="color:#9AA5A1">（只有照片，没写字）</span>')+'</div></div></div>';
+  });
+  const doc='<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+    +'<meta name="viewport" content="width=device-width,initial-scale=1"><title>灵感总结 · 中国行程</title>'
+    +'<style>'+IDEA_REPORT_CSS+'</style></head><body><div class="wrap">'
+    +'<h1>灵感总结 · 中国行程 2026年9月</h1>'
+    +'<p class="sub">共 '+live.length+' 条 · 带照片 '+D.withImg+' 条 · 有文字 '+D.withTxt+' 条 · 生成于 '+new Date().toLocaleString("zh-CN")+'</p>'
+    +'<div class="kpis"><div class="kpi"><b>'+live.length+'</b><span>条灵感</span></div>'
+    +'<div class="kpi"><b>'+D.withImg+'</b><span>带照片</span></div>'
+    +'<div class="kpi"><b>'+D.withTxt+'</b><span>有文字</span></div></div>'
+    +'<h2>按标签分布</h2>'+tags.map(t=>ideaBar(t,cnt[t],tmax)).join("")
+    +'<h2>按日期分布</h2>'+days.map(d=>ideaBar(d,D.byDay[d],dmax)).join("")
+    +'<h2>全部灵感（新 → 旧）</h2>'+cards
+    +'</div></body></html>';
+  const blob=new Blob([doc],{type:"text/html;charset=utf-8"});
+  const url=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=url; a.download="灵感总结-"+BUILD+".html";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+  toast("总结文件已导出，去「下载 / 文件」里打开");
 }
 
 /* ---------- 课程 ---------- */
@@ -2247,6 +2384,8 @@ document.addEventListener("click", e=>{
     if(!S.ideas.filter(x=>!x.hidden).length){ toast("还没有灵感"); return; }
     copyText(ideaText(),"已复制，粘贴给 Claude"); return;
   }
+  if(e.target.closest("#isum")){ ideaSumToggle(); return; }
+  if(e.target.closest("#isumExp")){ ideaSummaryExport(); return; }
   const tg=e.target.closest("[data-tag]");
   if(tg){
     const p=tg.dataset.tag.split("|");
