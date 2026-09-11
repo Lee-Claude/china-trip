@@ -362,10 +362,12 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-11.5";
+const BUILD="2026-09-11.6";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-11.6",c:[
+   "🐛 一键复制的地址改为「今晚要住的那家」：换房当天两家都命中时取后面一家（9/11 显示林夕居而不是已退房的琶洲）"]},
  {v:"2026-09-11.5",c:[
    "住宿页顶部新增「📋 登记信息 · 一键复制」：任力 + 18810888825 + 当前入住酒店地址，点一下整块复制，可直接粘贴到登记表/打车软件/发给对方",
    "地址按日期自动切换（今天住哪家就显示哪家）"]},
@@ -603,15 +605,17 @@ const DAYS=[
 const ME={name:"任力",phone:"18810888825",id:"身份证（国内登记用）"};
 function todayMD(){ const d=new Date(); return (d.getMonth()+1)+"/"+d.getDate(); }
 function curStay(){
+  /* 换房当天会有两家都命中（退的 + 今晚住的）——取最后一家，也就是今晚要住的那家 */
   const t=todayMD().split("/").map(Number), vn=t[0]*100+t[1];
+  let found=null;
   for(const s of STAYS){
     const p=(s.dates||"").split("–").map(x=>x.trim());
     if(p.length!==2) continue;
     const a=p[0].split("/").map(Number), b=p[1].split("/").map(Number);
     if(a.length<2||b.length<2) continue;
-    if(vn>=a[0]*100+a[1] && vn<=b[0]*100+b[1]) return s;
+    if(vn>=a[0]*100+a[1] && vn<=b[0]*100+b[1]) found=s;
   }
-  return null;
+  return found;
 }
 function meBlock(){
   const s=curStay();
