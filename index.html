@@ -362,10 +362,12 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-11.6";
+const BUILD="2026-09-11.7";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-11.7",c:[
+   "登记信息的地址改成「点选」：列出所有住过的酒店按钮，默认选中今晚能入住那家，点一下就能换（不再自动替你决定）"]},
  {v:"2026-09-11.6",c:[
    "🐛 一键复制的地址改为「今晚要住的那家」：换房当天两家都命中时取后面一家（9/11 显示林夕居而不是已退房的琶洲）"]},
  {v:"2026-09-11.5",c:[
@@ -617,10 +619,33 @@ function curStay(){
   }
   return found;
 }
+function meList(){
+  const out=[];
+  STAYS.forEach(function(s){ (s.opts||[]).forEach(function(o){ out.push({id:s.id+"|"+o.id,name:o.name,addr:o.addr||""}); }); });
+  return out;
+}
+function mePick(){
+  const L=meList(); if(!L.length) return null;
+  let sel=S.meStayId;
+  if(!sel){ const cs=curStay(); sel=(cs&&cs.opts&&cs.opts[0])?(cs.id+"|"+cs.opts[0].id):L[0].id; }
+  let hit=null; L.forEach(function(x){ if(x.id===sel) hit=x; });
+  return hit||L[0];
+}
+function meList(){
+  const out=[];
+  STAYS.forEach(function(s){ (s.opts||[]).forEach(function(o){ out.push({id:s.id+"|"+o.id,name:o.name,addr:o.addr||""}); }); });
+  return out;
+}
+function mePick(){
+  const L=meList(); if(!L.length) return null;
+  let sel=S.meStayId;
+  if(!sel){ const cs=curStay(); sel=(cs&&cs.opts&&cs.opts[0])?(cs.id+"|"+cs.opts[0].id):L[0].id; }
+  let hit=null; L.forEach(function(x){ if(x.id===sel) hit=x; });
+  return hit||L[0];
+}
 function meBlock(){
-  const s=curStay();
-  const o=(s&&s.opts&&s.opts[0])?s.opts[0]:null;
-  return ME.name+"　"+ME.phone+"\n"    +"证件："+ME.id+"\n"    +(o?("入住："+o.name+"\n"+o.addr):(s?("入住："+s.city+" "+s.dates):""));
+  const p=mePick();
+  return ME.name+"　"+ME.phone+"\n"+"证件："+ME.id+"\n"+(p?("入住："+p.name+"\n"+p.addr):"");
 }
 
 const VOUCH=[
@@ -907,9 +932,8 @@ function renderTrip(){
 
 /* ---------- 住宿 ---------- */
 function renderStay(){
-  const _cs=curStay(), _co=(_cs&&_cs.opts&&_cs.opts[0])?_cs.opts[0]:null;
-  let h='<h2 class="sec">📋 登记信息 · 一键复制</h2><div class="card">'    +'<div style="font-size:15px;line-height:1.95"><b style="font-size:16px">'+esc(ME.name)+'</b>　<span class="num">'+esc(ME.phone)+'</span>'    +'<div style="color:var(--mute);font-size:12.5px">证件：国内用身份证（护照只用于出入境 / 值机）</div>'    +(_co?('<div style="margin-top:6px">'+esc(_co.name)+'<div style="color:var(--ink-2);font-size:13px">'+esc(_co.addr)+'</div></div>'):"")
-    +'</div><button class="ghost wide" id="meCopy" style="margin-top:10px">📋 复制姓名 + 手机 + 地址</button>'    +'<p style="font-size:12px;color:var(--mute);margin:6px 0 0">点一下整块复制，直接粘到登记表、打车软件或发给对方。</p></div>';
+  const _p=mePick(), _L=meList();
+  let h='<h2 class="sec">📋 登记信息 · 一键复制</h2><div class="card">'    +'<div style="font-size:15px;line-height:1.95"><b style="font-size:16px">'+esc(ME.name)+'</b>　<span class="num">'+esc(ME.phone)+'</span>'    +'<div style="color:var(--mute);font-size:12.5px">证件：国内用身份证（护照只用于出入境 / 值机）</div></div>'    +'<div style="font-size:12.5px;color:var(--mute);margin:10px 0 5px">用哪个地址？点一下切换</div>'    +'<div class="chips">'+_L.map(function(x){ return '<button class="chip'+(_p&&x.id===_p.id?' on':'')+'" data-mestay="'+x.id+'">'+esc(x.name.replace(/✓已订/,''))+'</button>'; }).join('')+'</div>'    +(_p?('<div style="margin-top:9px;font-size:14px;line-height:1.7"><b>'+esc(_p.name)+'</b><div style="color:var(--ink-2)">'+esc(_p.addr)+'</div></div>'):'')    +'<button class="ghost wide" id="meCopy" style="margin-top:10px">📋 复制姓名 + 手机 + 地址</button>'    +'<p style="font-size:12px;color:var(--mute);margin:6px 0 0">默认选中「今晚能入住」那家；要用别家点上面的按钮。</p></div>';
 
   h+='<h2 class="sec">🎫 已订凭证（订单号都在这）</h2><div class="card">'
   +VOUCH.map(v=>'<div class="zrow" style="align-items:flex-start"><span style="flex:0 0 auto;font-size:11.5px;font-weight:640;color:'+(v.s==="✓已订"?"var(--done)":"var(--turmeric)")+'">'+esc(v.s)+'</span>'
@@ -938,6 +962,9 @@ function renderStay(){
   document.getElementById("v-stay").innerHTML=h;
   const mc=document.getElementById("meCopy");
   if(mc) mc.onclick=function(){ copyText(meBlock(),"已复制：姓名 + 手机 + 地址"); };
+  document.querySelectorAll("[data-mestay]").forEach(function(b){
+    b.onclick=function(){ S.meStayId=b.getAttribute("data-mestay"); save(); renderStay(); };
+  });
 
 }
 
