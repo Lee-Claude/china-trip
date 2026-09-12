@@ -158,6 +158,8 @@
   #cmergebar b{flex:1;font-size:13.5px}
   #cmergebar .scanbtn{flex:0 0 auto}
   #cmergebar .ghost{flex:0 0 auto;background:transparent;border-color:rgba(255,255,255,.4);color:#fff}
+  #updbar{position:fixed;top:0;left:0;right:0;z-index:200;background:var(--alert);color:#fff;font-size:13.5px;font-weight:640;text-align:center;padding:10px 12px calc(10px + env(safe-area-inset-top));cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+  #updbar b{margin-left:4px;text-decoration:underline}
   .cfields{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
   .crow{display:flex;gap:6px}
   .crow input.f{flex:1;min-width:0}
@@ -473,10 +475,13 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.8";
+const BUILD="2026-09-12.9";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.9",c:[
+   "★ 新版自动提醒：打开 App 3 秒后自动对比线上版本，有新版就在页面顶上挂一条「🆕 有新版本，点这里刷新」——点一下立即更新，再也不会闷在旧版里找不到新功能",
+   "🔧 这次你看不到「＋ 照片」和「⧉ 合并」就是旧版缓存闹的：关掉标签页重新打开，或网址后面加个 ?v=2 回车，就能看到 .8 的组化功能"]},
  {v:"2026-09-12.8",c:[
    "★ 课堂笔记组化：每条卡片下面有「＋ 照片」「＋ 备注」——照片可以继续往同一条里加，组成一组多图；备注一条条追加，带时间，可删",
    "★ 新增「⧉ 合并」：点开挑选模式，把几条散记点选成一堆，一键合成一组——照片全并进去，文字变成组里的补充备注，散条自动消失",
@@ -3329,6 +3334,25 @@ function autoLanding(now){
 if("serviceWorker" in navigator && location.protocol==="https:"){
   navigator.serviceWorker.register("sw.js").catch(()=>{});
 }
+
+/* 新版本自检（2026-09-12）：启动 3 秒后静默拉一次线上版本号，比本机旧就在顶部挂「刷新更新」横幅。
+   修的就是"发了新版手机上还是旧的"——HTTP 缓存 / 旧标签页快照都逃不掉，点横幅立即刷新 */
+setTimeout(function(){
+  if(location.protocol!=="http:"&&location.protocol!=="https:") return;
+  fetch(location.pathname.split("#")[0]+"?ck="+Date.now(),{cache:"no-store"}).then(function(r){
+    return r.ok?r.text():null;
+  }).then(function(t){
+    if(!t) return;
+    const m=t.match(/BUILD="([^"]+)"/);
+    if(m&&m[1]&&m[1]!==BUILD&&!document.getElementById("updbar")){
+      const b=document.createElement("div");
+      b.id="updbar";
+      b.innerHTML="🆕 有新版本（"+m[1]+"）<b>点这里刷新</b>";
+      b.onclick=function(){ location.reload(); };
+      document.body.appendChild(b);
+    }
+  }).catch(function(){});
+},3000);
 /* 服务器休眠探测：装了 PWA 之后休眠也照常打开，这里只是告诉你"现在是离线缓存版" */
 (function(){
   var shown=false;
