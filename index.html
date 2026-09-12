@@ -138,6 +138,10 @@
   .ghost.wide{width:100%;margin-bottom:9px;padding:14px;font-size:15px}
   .cardrow{display:flex;gap:11px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-bottom:10px}
   .thumb{flex:0 0 64px;width:64px;height:64px;border-radius:8px;object-fit:cover;background:#E4E9E6;border:1px solid var(--line)}
+  .twrap{position:relative;display:inline-block}
+  .twrap .thumb{display:block}
+  .trot{position:absolute;top:3px;right:3px;width:26px;height:26px;border-radius:50%;border:none;background:rgba(20,24,32,.62);color:#fff;font-size:13px;line-height:26px;text-align:center;padding:0;cursor:pointer;z-index:2;-webkit-tap-highlight-color:transparent}
+  .trot:active{background:rgba(20,24,32,.88)}
   .cfields{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
   .crow{display:flex;gap:6px}
   .crow input.f{flex:1;min-width:0}
@@ -453,10 +457,12 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.6";
+const BUILD="2026-09-12.7";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.7",c:[
+   "★ 照片能旋转了：课堂笔记 / 灵感本 / 名片的照片右上角都有「↻」，点一下顺时针转 90°，转到正为止；转完直接存进记录，Excel 导出、总结、放大看全是正的"]},
  {v:"2026-09-12.6",c:[
    "★ 新增「📍 地址簿」：行程页 + 展会页都有入口，11 个重要地址（广州 / 长沙 / 回程）集中一处，分组列好",
    "★ 全部地址一键直拉高德 App：点「高德」→ 系统弹一次「是否打开高德地图」→ 确认直接进 App 导航，不再在浏览器网页里绕；行程里原有的地图按钮也全部改成直拉 App",
@@ -807,6 +813,38 @@ function meBlock(){
 /* 地图导航：中国地址→高德地图（自动定位、自己选出行方式），海外地址→Google 地图。
    手机上点一下直接跳对应 App / 网页。
    mapBtn = 住宿页用的大按钮；mapChip = 行程页地址条目后面跟的小胶囊（2026-09-11 加） */
+/* ---------- 照片旋转（2026-09-12 Lee：拍歪了能转正） ---------- */
+const ROTBUSY={};
+function rotImg(dataUrl,cb){
+  const im=new Image();
+  im.onload=function(){
+    try{
+      const c=document.createElement("canvas");
+      c.width=im.height; c.height=im.width;   /* 顺时针 90°，宽高互换 */
+      const g=c.getContext("2d");
+      if(!g){ cb(null); return; }
+      g.translate(c.width/2,c.height/2);
+      g.rotate(Math.PI/2);
+      g.drawImage(im,-im.width/2,-im.height/2);
+      cb(c.toDataURL(/^data:image\/png/.test(dataUrl)?"image/png":"image/jpeg",0.9));
+    }catch(err){ cb(null); }
+  };
+  im.onerror=function(){ cb(null); };
+  im.src=dataUrl;
+}
+function rotApply(list,id,after){
+  const x=(list||[]).find(i=>i.id===id);
+  if(!x||!x.img){ toast("这条没有照片"); return; }
+  if(ROTBUSY[id]) return;
+  ROTBUSY[id]=1;
+  toast("转 90°…");
+  rotImg(x.img,function(nd){
+    delete ROTBUSY[id];
+    if(!nd){ toast("这张转不动，重新拍一张吧"); return; }
+    x.img=nd; save(); after();
+  });
+}
+
 function isChinaAddr(addr){
   const clean=String(addr||"").replace(/[（(].*?[)）]/g,"").replace(/\s+/g," ").trim();
   return /[一-龥]/.test(clean) && /(省|市|区|县|路|大道|街|镇|村|号|栋|广场|地铁|街道|新村|花园|站|机场)/.test(clean);
@@ -1542,7 +1580,7 @@ function renderExpo(){
       +'<b>手填一张</b> 不用照片，直接建空卡自己敲<br>每天收工点<b>导出</b>，把复制的内容发给 Claude 做加工</div>';
   }else{
     live.slice().reverse().forEach(c=>{
-      h+= c.img ? '<div class="cardrow"><img class="thumb" src="'+c.img+'" alt="名片">'
+      h+= c.img ? '<div class="cardrow"><span class="twrap"><img class="thumb" src="'+c.img+'" alt="名片"><button class="trot" data-crot2="'+c.id+'" title="旋转 90°">↻</button></span>'
                 : '<div class="cardrow"><span class="thumb" style="display:grid;place-items:center;color:var(--mute);font-size:11px">手填</span>';
       h+='<div class="cfields">'
         +(c.stat?'<div class="cstat">'+esc(c.stat)+'</div>':"")
@@ -1667,7 +1705,7 @@ function renderIdea(){
         +'<div class="ihead"><span class="when num">'+fmt(x.ts)+'</span>'
         +'<button class="del" data-hideidea="'+x.id+'">收进回收站</button></div>'
         +'<div class="irow">'
-        +(x.img?'<img class="thumb" src="'+x.img+'" alt="灵感照片" data-zoom="'+x.id+'">':"")
+        +(x.img?'<span class="twrap"><img class="thumb" src="'+x.img+'" alt="灵感照片" data-zoom="'+x.id+'"><button class="trot" data-irot="'+x.id+'" title="旋转 90°">↻</button></span>':"")
         +'<textarea data-idea="'+x.id+'" placeholder="这道菜怎么做、包装好在哪、这家店动线哪里聪明…"></textarea></div>'
         +'<div class="itags">'+ITAGS.map(t=>'<button class="tag'+(x.tag===t?" on":"")+'" data-tag="'+x.id+"|"+t+'">'+t+'</button>').join("")+'</div>'
         +'</div>';
@@ -2016,7 +2054,7 @@ function renderNote(){
       +[{v:"全部"}].concat(cused).map(f=>'<button class="tag'+(cFilter===f.v?" on":"")+'" data-cfilter="'+f.v+'">'+(f.v==="全部"?"全部":f.v.replace("·"," "))+'</button>').join("")+'</div>';
     const noteCard=x=>'<div class="idea">'
       +'<div class="ihead"><span class="when num">'+fmt(x.ts)+'</span><button class="del" data-hidecnote="'+x.id+'">删除</button></div>'
-      +'<div class="irow">'+(x.img?'<img class="thumb" src="'+x.img+'" alt="课堂照片" data-zoom2="'+x.id+'">':"")
+      +'<div class="irow">'+(x.img?'<span class="twrap"><img class="thumb" src="'+x.img+'" alt="课堂照片" data-zoom2="'+x.id+'"><button class="trot" data-crot="'+x.id+'" title="旋转 90°">↻</button></span>':"")
       +'<textarea data-cnote="'+x.id+'" placeholder="老师讲的要点、手法要领、工具型号…">'+esc(x.txt)+'</textarea></div>'
       +'<div class="itags"><select class="csel" data-csess="'+x.id+'"><option value="">不标节次</option>'
       +CSESS.map(s=>'<option value="'+s.v+'"'+(x.sess===s.v?" selected":"")+'>'+esc(s.lab)+'</option>').join("")
@@ -2929,6 +2967,14 @@ document.addEventListener("click", e=>{
   if(aop){ document.getElementById("asheet").classList.remove("on"); const ab=AB[+aop.dataset.aopen]; openMap(ab.a,ab.gmap); return; }
   const acp=e.target.closest("[data-acopy]");
   if(acp){ const ab2=AB[+acp.dataset.acopy]; copyText(ab2.n+"："+ab2.a,"地址已复制"); return; }
+  /* 照片旋转（2026-09-12）：课堂笔记 / 灵感本 / 名片，点一下顺时针转 90° */
+  const rtb=e.target.closest("[data-crot],[data-irot],[data-crot2]");
+  if(rtb){
+    if(rtb.dataset.crot) rotApply(S.cnotes,rtb.dataset.crot,renderNote);
+    else if(rtb.dataset.irot) rotApply(S.ideas,rtb.dataset.irot,renderIdea);
+    else rotApply(S.cards,rtb.dataset.crot2,renderExpo);
+    return;
+  }
   if(e.target.closest("#cpick")){ pickTarget="cnote"; ipicker.click(); return; }
   if(e.target.closest("#ctoday")){ cnoteOpenToday(); return; }
   if(e.target.closest("#csum")){ cnoteSumToggle(); return; }
