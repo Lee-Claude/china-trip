@@ -174,6 +174,22 @@
   #rbtn svg{width:20px;height:20px;stroke:var(--indigo);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
   #rbtn.spin svg{animation:rbspin .7s linear infinite}
   @keyframes rbspin{to{transform:rotate(360deg)}}
+  /* 合并模式拖动排序 */
+  .draghd{cursor:grab;touch-action:none;font-size:11.5px;color:var(--ink2);padding:3px 9px;border:1px solid var(--line);border-radius:11px;background:var(--paper);user-select:none;-webkit-user-select:none}
+  .draghd:active{cursor:grabbing;background:var(--indigo-soft)}
+  .idea.cmerge.dragging{opacity:.92;box-shadow:0 10px 26px rgba(20,32,29,.24);transition:none}
+  /* 问师傅清单 */
+  .qgrp{border-top:1px dashed var(--line);padding:9px 0 2px;margin-top:4px}
+  .qgrp:first-of-type{border-top:none;padding-top:0;margin-top:0}
+  .qgrphd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1px}
+  .qgrphd b{font-size:13.5px;color:var(--indigo)}
+  .qgrphd span{font-size:11.5px;color:var(--mute)}
+  .qrow2{display:grid;grid-template-columns:24px 1fr;gap:5px 8px;align-items:center;margin:8px 0 0}
+  .qrow2 .qchk{width:19px;height:19px;accent-color:var(--indigo);margin:0;justify-self:center;cursor:pointer}
+  .qrow2 .qq{grid-column:2}
+  .qrow2 .qa{grid-column:2;font-size:13px;color:var(--ink2);border-style:dashed}
+  .qrow2.qdone .qq{text-decoration:line-through;color:var(--mute)}
+  .qrow2.qdone .qa{color:var(--mute)}
   .cfields{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
   .crow{display:flex;gap:6px}
   .crow input.f{flex:1;min-width:0}
@@ -491,10 +507,13 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.11";
+const BUILD="2026-09-12.12";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.12",c:[
+   "★ 合并挑选模式能拖动排序了：每张卡右上角有「≡ 拖动」，按住上下拖，整卡（照片+备注+图注）跟着走，松手记住顺序；点「合成一组」就按你排的顺序合并，排第一的是组的主条目",
+   "★ 课程页新增「❓ 要问师傅的问题」：Lee / Peng / Vi 各一本，每行左边打勾=已解决、中间写要问的、下面写解决方案；一行用完自动长出新行，谁还有几个没解决一目了然"]},
  {v:"2026-09-12.11",c:[
    "★ 右下角常驻「↻ 刷新」按钮：不管在哪一页都能看到，点一下 = 清掉缓存 + 重新拉取最新版，一秒钟拿到最新状态（以前那种「手机上还是旧版」的情况，点它就解决）"]},
  {v:"2026-09-12.10",c:[
@@ -909,7 +928,16 @@ function rotApplyIdx(id,idx,after){
 function cMergeDo(){
   const sel=(S.cMergeSel||[]).slice();
   if(sel.length<2){ toast("先挑至少两条"); return; }
-  const picked=(S.cnotes||[]).filter(x=>sel.indexOf(x.id)>=0&&!x.hidden).sort((a,b)=>a.ts-b.ts);
+  const ord=(Array.isArray(S.cMergeOrder)&&S.cMergeOrder.length)?S.cMergeOrder:null;
+  const picked=(S.cnotes||[]).filter(x=>sel.indexOf(x.id)>=0&&!x.hidden).sort((a,b)=>{
+    if(ord){
+      const ia=ord.indexOf(a.id), ib=ord.indexOf(b.id);
+      if(ia>=0&&ib>=0) return ia-ib;
+      if(ia>=0) return -1;
+      if(ib>=0) return 1;
+    }
+    return a.ts-b.ts;
+  });
   if(picked.length<2){ toast("先挑至少两条"); return; }
   const nPic=picked.reduce((s,x)=>s+((x.imgs||[]).length),0);
   if(!confirm("把这 "+picked.length+" 条合成一组？共 "+nPic+" 张照片会按顺序排好，每条的文字自动变成它照片的图注")) return;
@@ -2028,6 +2056,16 @@ const CTYPES=["配料","物料","刀工","手法","摆盘","设备","其他"];
 const CTICO={"配料":"🧂","物料":"🛒","刀工":"🔪","手法":"🤲","摆盘":"🍽️","设备":"🛠️","其他":"📦","未分类":"❔"};
 function ctypeOrder(t){ const i=CTYPES.indexOf(t); return i<0?99:i; }
 function ctypeLab(t){ return t||"未分类"; }
+/* ---- 问师傅（2026-09-12 Lee）：左勾=已解决 / 中间问题 / 右边方案；Lee·Peng·Vi 各一本，写满自动加行 ---- */
+const QWHOS=["Lee","Peng","Vi"];
+function newQ(who){ return {id:"q"+Date.now()+Math.random().toString(36).slice(2,6),who:who,q:"",a:"",done:false,ts:Date.now()}; }
+function qRowHTML(q){
+  return '<div class="qrow2'+(q.done?" qdone":"")+'" data-qrow="'+q.id+'">'
+    +'<input type="checkbox" class="qchk" data-qchk="'+q.id+'"'+(q.done?" checked":"")+' title="打勾 = 已解决">'
+    +'<input class="f qq" data-qq="'+q.id+'" value="'+esc(q.q)+'" placeholder="要问师傅什么？">'
+    +'<input class="f qa" data-qa="'+q.id+'" value="'+esc(q.a)+'" placeholder="解决方案 / 答案">'
+    +'</div>';
+}
 function startOfToday(){ const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(); }
 /* 写当天笔记：今天该节次里没写字的那条直接拿来写，没有就新建一条并聚焦 */
 function cnoteOpenToday(){
@@ -2159,6 +2197,15 @@ function renderNote(){
   const clive=(cSort==="type")
     ?cAll.slice().sort((a,b)=>ctypeOrder(a.type)-ctypeOrder(b.type)||(a.ts-b.ts))
     :cAll.slice().sort((a,b)=>cSort==="old"?(a.ts-b.ts):(b.ts-a.ts));
+  /* 合并模式：优先用用户拖动出来的顺序（S.cMergeOrder），没拖过的按时间排后面 */
+  const morder=(S.cMergeMode&&Array.isArray(S.cMergeOrder)&&S.cMergeOrder.length)?S.cMergeOrder:null;
+  const mlist=morder?cAll.slice().sort((a,b)=>{
+    const ia=morder.indexOf(a.id), ib=morder.indexOf(b.id);
+    if(ia>=0&&ib>=0) return ia-ib;
+    if(ia>=0) return -1;
+    if(ib>=0) return 1;
+    return a.ts-b.ts;
+  }):clive;
   const cdead=S.cnotes.filter(x=>x.hidden);
   const cused=CSESS.filter(s=>cAll.some(x=>x.sess===s.v));
   h+='<div class="sechd"><h2>📚 课堂笔记'+(cAll.length?"（"+cAll.length+"）":"")+'</h2></div>';
@@ -2190,7 +2237,7 @@ function renderNote(){
     const mergeCard=x=>{
       const brief=(String(x.txt||"").trim()+" "+(x.extras||[]).map(e2=>String(e2.txt||"").trim()).filter(Boolean).join(" ")).slice(0,60);
       return '<div class="idea cmerge'+(selArr.indexOf(x.id)>=0?" msel":"")+'" data-mergep="'+x.id+'">'
-        +'<div class="ihead"><span class="when num">'+fmt(x.ts)+" · "+esc(sessLab(x.sess))+'</span><span class="mtick">'+(selArr.indexOf(x.id)>=0?"✓ 已选":"点这选")+'</span></div>'
+        +'<div class="ihead"><span class="when num">'+fmt(x.ts)+" · "+esc(sessLab(x.sess))+'</span><span class="draghd" data-draghd="'+x.id+'" title="按住上下拖，调整合并后的顺序">≡ 拖动</span><span class="mtick">'+(selArr.indexOf(x.id)>=0?"✓ 已选":"点这选")+'</span></div>'
         +((x.imgs||[]).length?'<div class="cimgs">'+x.imgs.map(im=>'<img class="thumb" src="'+im+'" alt="">').join("")+'</div>':'<p class="meta" style="margin:6px 0 0">（无照片）</p>')
         +'<p class="meta" style="margin:6px 0 0;white-space:pre-wrap;word-break:break-word">'+esc(brief||"（没写字）")+'</p></div>';
     };
@@ -2212,7 +2259,7 @@ function renderNote(){
         +'</select></div></div>';
     };
     let lastG=null;
-    clive.forEach(x=>{
+    (S.cMergeMode?mlist:clive).forEach(x=>{
       if(cFilter!=="全部"&&cFilter!==x.sess) return;
       if(!S.cMergeMode&&cSort==="type"){
         const g=x.type||"未分类";
@@ -2231,6 +2278,22 @@ function renderNote(){
         +'</details>';
     }
   }
+
+  /* ---- 问师傅（2026-09-12 Lee）---- */
+  if(!Array.isArray(S.questions)) S.questions=[];
+  QWHOS.forEach(function(who){
+    if(!S.questions.some(q=>q.who===who&&!String(q.q||"").trim()&&!String(q.a||"").trim())) S.questions.push(newQ(who));
+  });
+  const qUnd=S.questions.filter(q=>!q.done&&(String(q.q||"").trim()||String(q.a||"").trim())).length;
+  h+='<div class="sechd"><h2>❓ 要问师傅的问题</h2><span class="msync">左勾 = 已解决 · 中间问题 · 右下方案 · 写满自动加行</span></div>';
+  h+='<div class="card" id="qmaster">';
+  QWHOS.forEach(function(who){
+    const rows=S.questions.filter(q=>q.who===who);
+    const und=rows.filter(q=>!q.done&&(String(q.q||"").trim()||String(q.a||"").trim())).length;
+    h+='<div class="qgrp" data-qgrp="'+who+'"><div class="qgrphd"><b>'+who+'</b><span>未解决 '+und+'</span></div>'
+      +rows.map(qRowHTML).join("")+'</div>';
+  });
+  h+='<p class="meta" style="margin:9px 2px 0">一行用完，下面自动长出新的一行。'+(qUnd?('现在还有 <b>'+qUnd+'</b> 个没解决。'):"现在都解决了。")+'</p></div>';
 
   NOTES.forEach(n=>{
     h+='<div style="margin-bottom:16px"><div class="nlab"><b>'+esc(n[1])+'</b>'+(n[3]?'<span>'+esc(n[3])+'</span>':"")+'</div>'
@@ -2691,6 +2754,24 @@ ipicker.addEventListener("change", async e=>{
 });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(quick.classList.contains("on")) qClose(); if(psheet.classList.contains("on")) pClose(); } });
 document.addEventListener("change",e=>{
+  /* 问师傅：打勾（change 事件，2026-09-12） */
+  const qk=e.target.closest("input[data-qchk]");
+  if(qk){
+    const q=(S.questions||[]).find(v=>v.id===qk.dataset.qchk);
+    if(q){
+      q.done=qk.checked; save();
+      const row=qk.closest(".qrow2");
+      if(row) row.classList.toggle("qdone",q.done);
+      const grp=qk.closest(".qgrp");
+      if(grp){
+        const und=(S.questions||[]).filter(v=>v.who===grp.dataset.qgrp&&!v.done&&(String(v.q||"").trim()||String(v.a||"").trim())).length;
+        const sp=grp.querySelector(".qgrphd span");
+        if(sp) sp.textContent="未解决 "+und;
+      }
+      toast(q.done?"✓ 解决了":"先留着，记得问");
+    }
+    return;
+  }
   const cs=e.target.closest("select[data-csess]");
   if(cs){
     const x=(S.cnotes||[]).find(i=>i.id===cs.dataset.csess);
@@ -3107,6 +3188,46 @@ function renderExp(){
   });
 }
 
+/* 合并模式拖动排序（2026-09-12 Lee）：按住「≡ 拖动」手柄上下拖，整卡（照片+备注）跟着走，
+   松手记住顺序；合并时按这个顺序排，第一位的就是组的主条目 */
+let mdEl=null, mdY0=0;
+document.addEventListener("pointerdown",e=>{
+  const h=e.target.closest("[data-draghd]");
+  if(!h||!S.cMergeMode) return;
+  mdEl=h.closest("[data-mergep]");
+  if(!mdEl) return;
+  e.preventDefault();
+  mdEl.classList.add("dragging");
+  mdY0=e.clientY;
+  const move=ev=>{
+    if(!mdEl) return;
+    const dy=ev.clientY-mdY0;
+    mdEl.style.transform="translateY("+dy+"px)";
+    const nxt=mdEl.nextElementSibling, prv=mdEl.previousElementSibling;
+    if(nxt&&nxt.classList&&nxt.classList.contains("cmerge")){
+      const r=nxt.getBoundingClientRect();
+      if(ev.clientY>r.top+r.height/2){ mdEl.parentNode.insertBefore(nxt,mdEl); mdY0=ev.clientY; mdEl.style.transform=""; }
+    }else if(prv&&prv.classList&&prv.classList.contains("cmerge")){
+      const r=prv.getBoundingClientRect();
+      if(ev.clientY<r.top+r.height/2){ mdEl.parentNode.insertBefore(mdEl,prv); mdY0=ev.clientY; mdEl.style.transform=""; }
+    }
+  };
+  const up=()=>{
+    document.removeEventListener("pointermove",move);
+    document.removeEventListener("pointerup",up);
+    document.removeEventListener("pointercancel",up);
+    if(mdEl){
+      mdEl.style.transform=""; mdEl.classList.remove("dragging");
+      S.cMergeOrder=[...mdEl.parentNode.querySelectorAll("[data-mergep]")].map(c=>c.dataset.mergep);
+      save();
+    }
+    mdEl=null;
+  };
+  document.addEventListener("pointermove",move,{passive:false});
+  document.addEventListener("pointerup",up);
+  document.addEventListener("pointercancel",up);
+});
+
 /* ---------- 事件 ---------- */
 document.addEventListener("click", e=>{
   if(e.target.closest("#rbtn")){ hardRefresh(); return; }
@@ -3191,7 +3312,7 @@ document.addEventListener("click", e=>{
   if(e.target.closest("#cmergecancel")){ S.cMergeMode=false; S.cMergeSel=[]; renderNote(); return; }
   if(S.cMergeMode){
     const mp=e.target.closest("[data-mergep]");
-    if(mp){
+    if(mp&&!e.target.closest("[data-draghd]")){
       const arr=S.cMergeSel||(S.cMergeSel=[]);
       const ix=arr.indexOf(mp.dataset.mergep);
       if(ix>=0) arr.splice(ix,1); else arr.push(mp.dataset.mergep);
@@ -3346,6 +3467,41 @@ document.addEventListener("input", e=>{
       if(!Array.isArray(x.caps)) x.caps=[];
       x.caps[+p[1]]=cc.value;
       save();
+    }
+    return;
+  }
+  /* 问师傅：问题/方案输入 + 自动加行（2026-09-12） */
+  const qi=e.target.closest("input[data-qq]");
+  if(qi){
+    const q=(S.questions||[]).find(v=>v.id===qi.dataset.qq);
+    if(q){
+      q.q=qi.value; save();
+      const grp=qi.closest(".qgrp");
+      if(grp){
+        const rows=grp.querySelectorAll(".qrow2");
+        if(rows[rows.length-1]===qi.closest(".qrow2")&&String(qi.value).trim()){
+          const nq=newQ(grp.dataset.qgrp);
+          S.questions.push(nq);
+          grp.insertAdjacentHTML("beforeend",qRowHTML(nq));
+        }
+      }
+    }
+    return;
+  }
+  const qa=e.target.closest("input[data-qa]");
+  if(qa){
+    const q=(S.questions||[]).find(v=>v.id===qa.dataset.qa);
+    if(q){
+      q.a=qa.value; save();
+      const grp=qa.closest(".qgrp");
+      if(grp){
+        const rows=grp.querySelectorAll(".qrow2");
+        if(rows[rows.length-1]===qa.closest(".qrow2")&&String(qa.value).trim()){
+          const nq=newQ(grp.dataset.qgrp);
+          S.questions.push(nq);
+          grp.insertAdjacentHTML("beforeend",qRowHTML(nq));
+        }
+      }
     }
     return;
   }
