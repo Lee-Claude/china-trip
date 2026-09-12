@@ -507,10 +507,13 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.12";
+const BUILD="2026-09-12.13";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.13",c:[
+   "★ 已合并的组里也能拖了：每张「图 + 图注」行首有「≡」，按住上下拖就能换位置，图和它的说明永远一起挪，松手自动保存",
+   "🔧 旧的「要问师傅的问题」文字框已下线（换成上面的 Lee / Peng / Vi 问师傅清单），旧内容不再显示"]},
  {v:"2026-09-12.12",c:[
    "★ 合并挑选模式能拖动排序了：每张卡右上角有「≡ 拖动」，按住上下拖，整卡（照片+备注+图注）跟着走，松手记住顺序；点「合成一组」就按你排的顺序合并，排第一的是组的主条目",
    "★ 课程页新增「❓ 要问师傅的问题」：Lee / Peng / Vi 各一本，每行左边打勾=已解决、中间写要问的、下面写解决方案；一行用完自动长出新行，谁还有几个没解决一目了然"]},
@@ -1168,7 +1171,6 @@ const PLAN=[
 
 const NOTES=[
  ["n_info","课程信息","濑户料理学院 · 开福区黄兴北路 89 号 上城金都·国际公馆 南栋 1425 室 · 地铁 1 号线培元桥站\n寿司 9/11–9/14（你从 9/12 上）+ 刺身 9/15–9/16，合计 ¥5980\n两人交一份钱，第二人不实操","随手补充"],
- ["n_ask","要问师傅的问题","","想到就记"],
  ["n_912","9/12 · 寿司 D2","","醋饭配比、刀工、握的手法"],
  ["n_913","9/13 · 寿司 D3","",""],
  ["n_914","9/14 · 寿司 D4","",""],
@@ -2192,6 +2194,8 @@ function renderNote(){
     S.cnotes.forEach(x=>{ if(!Array.isArray(x.caps)) x.caps=[]; });
     S.cnoteMig3=1;
   }
+  /* 旧「要问师傅」便签组件已下线（换成了下面的问师傅清单，2026-09-12）：清掉旧数据 */
+  if(S.notes&&S.notes.n_ask!==undefined){ delete S.notes.n_ask; save(); }
   const cSort=S.cSort||"new";
   const cAll=S.cnotes.filter(x=>!x.hidden);
   const clive=(cSort==="type")
@@ -2226,8 +2230,9 @@ function renderNote(){
       +'<button class="tag'+(S.cMergeMode?" on":"")+'" data-cmergetoggle="1">⧉ 合并</button></div>';
     h+='<div class="itags" style="margin:0 0 10px">'
       +[{v:"全部"}].concat(cused).map(f=>'<button class="tag'+(cFilter===f.v?" on":"")+'" data-cfilter="'+f.v+'">'+(f.v==="全部"?"全部":f.v.replace("·"," "))+'</button>').join("")+'</div>';
-    /* 照片组：每张图一行 —— 左边图、右边这张对应的图注，条理清楚（2026-09-12） */
-    const imgRow=(x,i)=>'<div class="iitem">'
+    /* 照片组：每张图一行 —— 手柄 + 图 + 这张对应的图注，可上下拖动换位置（2026-09-12） */
+    const imgRow=(x,i)=>'<div class="iitem" data-ci="'+i+'">'
+      +'<span class="draghd dragci" data-dragci="'+x.id+"|"+i+'" title="按住上下拖，调整这张照片的位置">≡</span>'
       +'<span class="twrap"><img class="thumb" src="'+x.imgs[i]+'" alt="课堂照片" data-zoom2="'+x.id+"|"+i+'">'
       +'<button class="trot" data-crot="'+x.id+"|"+i+'" title="旋转 90°">↻</button>'
       +'<button class="tdel" data-cdel="'+x.id+"|"+i+'" title="拿掉这张照片">✕</button></span>'
@@ -2243,7 +2248,7 @@ function renderNote(){
     };
     const noteCard=x=>{
       const n=(x.imgs||[]).length;
-      const imgs=n?'<div class="imglist">'+x.imgs.map((im,i)=>imgRow(x,i)).join("")+'</div>':"";
+      const imgs=n?'<div class="imglist" data-clist="'+x.id+'">'+x.imgs.map((im,i)=>imgRow(x,i)).join("")+'</div>':"";
       const extras=(x.extras||[]).map(e2=>'<div class="extra"><span class="when num">'+fmt(e2.ts)+'</span><input class="f" data-cextra="'+x.id+"|"+e2.id+'" value="'+esc(e2.txt)+'" placeholder="整组的补充备注…"><button class="del" data-cexdel="'+x.id+"|"+e2.id+'">✕</button></div>').join("");
       return '<div class="idea">'
         +'<div class="ihead"><span class="when num">'+fmt(x.ts)+'</span><button class="del" data-hidecnote="'+x.id+'">删除</button></div>'
@@ -3222,6 +3227,55 @@ document.addEventListener("pointerdown",e=>{
       save();
     }
     mdEl=null;
+  };
+  document.addEventListener("pointermove",move,{passive:false});
+  document.addEventListener("pointerup",up);
+  document.addEventListener("pointercancel",up);
+});
+
+/* 组内照片行拖动（2026-09-12 Lee：已合并的组里，每张"图+图注"也能上下拖换位置）：
+   按住行首「≡」上下拖，松手按新顺序重排 imgs/caps（图和图注永远一对） */
+let miEl=null, miY0=0;
+document.addEventListener("pointerdown",e=>{
+  const h=e.target.closest("[data-dragci]");
+  if(!h) return;
+  miEl=h.closest(".iitem");
+  if(!miEl) return;
+  e.preventDefault();
+  miEl.classList.add("dragging");
+  miY0=e.clientY;
+  const move=ev=>{
+    if(!miEl) return;
+    const dy=ev.clientY-miY0;
+    miEl.style.transform="translateY("+dy+"px)";
+    const nxt=miEl.nextElementSibling, prv=miEl.previousElementSibling;
+    if(nxt&&nxt.classList&&nxt.classList.contains("iitem")){
+      const r=nxt.getBoundingClientRect();
+      if(ev.clientY>r.top+r.height/2){ miEl.parentNode.insertBefore(nxt,miEl); miY0=ev.clientY; miEl.style.transform=""; }
+    }else if(prv&&prv.classList&&prv.classList.contains("iitem")){
+      const r=prv.getBoundingClientRect();
+      if(ev.clientY<r.top+r.height/2){ miEl.parentNode.insertBefore(miEl,prv); miY0=ev.clientY; miEl.style.transform=""; }
+    }
+  };
+  const up=()=>{
+    document.removeEventListener("pointermove",move);
+    document.removeEventListener("pointerup",up);
+    document.removeEventListener("pointercancel",up);
+    if(miEl){
+      miEl.style.transform=""; miEl.classList.remove("dragging");
+      const wrap=miEl.closest("[data-clist]");
+      if(wrap){
+        const cid=wrap.dataset.clist;
+        const x=(S.cnotes||[]).find(i=>i.id===cid);
+        if(x){
+          const order=[...wrap.querySelectorAll(".iitem")].map(it=>+it.dataset.ci);
+          x.imgs=order.map(k=>x.imgs[k]);
+          x.caps=order.map(k=>((x.caps||[])[k])||"");
+          save(); renderNote(); toast("顺序调好了，图和说明一起挪");
+        }
+      }
+    }
+    miEl=null;
   };
   document.addEventListener("pointermove",move,{passive:false});
   document.addEventListener("pointerup",up);
