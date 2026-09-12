@@ -435,10 +435,12 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.2";
+const BUILD="2026-09-12.3";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.3",c:[
+   "★ 打开 App 智能直达：课程期间（9/12–9/16）一进来就是「课程」页；展会期间（9/17–9/20）一进来就是「展会」页；其他日子照旧先进「行程」页，不用手动切"]},
  {v:"2026-09-12.2",c:[
    "🐞 修复课堂笔记 bug：打的字其实一直有保存，但重新渲染（点筛选/改节次/加照片/重开 App）后输入框显示为空，看起来像没存——已修复，现在输入框始终回显已保存的内容"]},
  {v:"2026-09-12.1",c:[
@@ -2857,6 +2859,22 @@ document.querySelectorAll("nav button").forEach(b=>{
     window.scrollTo(0,0);
   });
 });
+
+/* 智能落页（2026-09-12 Lee）：课程期间(9/12–9/16)打开 App 直达「课程」，展会期间(9/17–9/20)直达「展会」，其余日期照旧落在行程页 */
+function autoLanding(now){
+  const d=now||new Date(), m=d.getMonth()+1, day=d.getDate();
+  if(m===9&&day>=12&&day<=16) return "note";
+  if(m===9&&day>=17&&day<=20) return "expo";
+  return null;
+}
+(function(){
+  const v=autoLanding();
+  if(!v||v==="trip") return;
+  document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("on",x.dataset.v===v));
+  document.querySelectorAll(".view").forEach(x=>x.classList.remove("on"));
+  const sec=document.getElementById("v-"+v);
+  if(sec) sec.classList.add("on");
+})();
 
 if("serviceWorker" in navigator && location.protocol==="https:"){
   navigator.serviceWorker.register("sw.js").catch(()=>{});
