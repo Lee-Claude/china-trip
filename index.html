@@ -435,10 +435,13 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.3";
+const BUILD="2026-09-12.4";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.4",c:[
+   "★ 课堂笔记排序三模式：「⏷ 最新在上」「⏶ 最新在下」「🗂 按类型」——按类型时分成 配料 / 物料 / 刀工 / 手法 / 摆盘 / 设备 / 其他 七类，组内按上课时间正序",
+   "★ 每条笔记加了类型下拉（和节次并排），选好类型自动归组；导出 Excel 也加了「类型」列"]},
  {v:"2026-09-12.3",c:[
    "★ 打开 App 智能直达：课程期间（9/12–9/16）一进来就是「课程」页；展会期间（9/17–9/20）一进来就是「展会」页；其他日子照旧先进「行程」页，不用手动切"]},
  {v:"2026-09-12.2",c:[
@@ -1795,9 +1798,14 @@ function addCnote(img){
   if(!Array.isArray(S.cnotes)) S.cnotes=[];
   if(S.cnotes.filter(x=>!x.hidden).length>=MAX_CNOTES){ toast("课堂笔记到 "+MAX_CNOTES+" 条上限了，先导出 Excel，再删几条旧的"); return null; }
   const id="c"+Date.now()+Math.random().toString(36).slice(2,6);
-  S.cnotes.push({id,ts:Date.now(),img:img||"",txt:"",sess:nowSess(),hidden:false});
+  S.cnotes.push({id,ts:Date.now(),img:img||"",txt:"",sess:nowSess(),type:"",hidden:false});
   return id;
 }
+/* 笔记类型（2026-09-12 Lee：可按类型归类排序） */
+const CTYPES=["配料","物料","刀工","手法","摆盘","设备","其他"];
+const CTICO={"配料":"🧂","物料":"🛒","刀工":"🔪","手法":"🤲","摆盘":"🍽️","设备":"🛠️","其他":"📦","未分类":"❔"};
+function ctypeOrder(t){ const i=CTYPES.indexOf(t); return i<0?99:i; }
+function ctypeLab(t){ return t||"未分类"; }
 function renderNote(){
   let h='<div class="banner ok"><b>写完就存</b><br>停止输入半秒后自动保存到这台设备，并每 5 分钟留一个可回滚的存档点。</div>';
   h+='<details class="card" style="margin-bottom:14px"><summary style="cursor:pointer;font-size:14.5px;font-weight:640">📋 寿司课程安排（6 天 · 上午 9:30–12:00 / 下午 14:00–18:00）· 点开看每天学什么</summary>'
@@ -1809,30 +1817,44 @@ function renderNote(){
 
   /* ---- 课堂笔记 ---- */
   if(!Array.isArray(S.cnotes)) S.cnotes=[];
-  const clive=S.cnotes.filter(x=>!x.hidden).sort((a,b)=>sessOrder(a.sess)-sessOrder(b.sess)||(a.ts-b.ts));
+  const cSort=S.cSort||"new";
+  const cAll=S.cnotes.filter(x=>!x.hidden);
+  const clive=(cSort==="type")
+    ?cAll.slice().sort((a,b)=>ctypeOrder(a.type)-ctypeOrder(b.type)||(a.ts-b.ts))
+    :cAll.slice().sort((a,b)=>cSort==="old"?(a.ts-b.ts):(b.ts-a.ts));
   const cdead=S.cnotes.filter(x=>x.hidden);
-  const cused=CSESS.filter(s=>clive.some(x=>x.sess===s.v));
-  h+='<div class="sechd"><h2>📚 课堂笔记'+(clive.length?"（"+clive.length+"）":"")+'</h2></div>';
+  const cused=CSESS.filter(s=>cAll.some(x=>x.sess===s.v));
+  h+='<div class="sechd"><h2>📚 课堂笔记'+(cAll.length?"（"+cAll.length+"）":"")+'</h2></div>';
   h+='<div class="scanbar">'
     +'<button class="scanbtn" id="cpick"><svg viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3.5"/></svg>拍照 / 选图</button>'
     +'<button class="ghost" id="cnew">写一条</button>'
     +'<button class="ghost" id="cxls">📊 导出 Excel</button></div>';
-  if(!clive.length){
+  if(!cAll.length){
     h+='<div class="empty">上课随手记：老师讲的要点、手上的手法要领、工具的型号价格——<b>拍一张</b>或<b>写一句</b>，会自动标好是哪天哪节课。回去点「导出 Excel」，一条一行带照片，复习快。</div>';
   }else{
+    h+='<div class="itags" style="margin:0 0 6px">'
+      +'<button class="tag'+(cSort==="new"?" on":"")+'" data-csort="new">⏷ 最新在上</button>'
+      +'<button class="tag'+(cSort==="old"?" on":"")+'" data-csort="old">⏶ 最新在下</button>'
+      +'<button class="tag'+(cSort==="type"?" on":"")+'" data-csort="type">🗂 按类型</button></div>';
     h+='<div class="itags" style="margin:0 0 10px">'
       +[{v:"全部"}].concat(cused).map(f=>'<button class="tag'+(cFilter===f.v?" on":"")+'" data-cfilter="'+f.v+'">'+(f.v==="全部"?"全部":f.v.replace("·"," "))+'</button>').join("")+'</div>';
-    let lastS=null;
+    const noteCard=x=>'<div class="idea">'
+      +'<div class="ihead"><span class="when num">'+fmt(x.ts)+'</span><button class="del" data-hidecnote="'+x.id+'">删除</button></div>'
+      +'<div class="irow">'+(x.img?'<img class="thumb" src="'+x.img+'" alt="课堂照片" data-zoom2="'+x.id+'">':"")
+      +'<textarea data-cnote="'+x.id+'" placeholder="老师讲的要点、手法要领、工具型号…">'+esc(x.txt)+'</textarea></div>'
+      +'<div class="itags"><select class="csel" data-csess="'+x.id+'"><option value="">不标节次</option>'
+      +CSESS.map(s=>'<option value="'+s.v+'"'+(x.sess===s.v?" selected":"")+'>'+esc(s.lab)+'</option>').join("")
+      +'</select><select class="csel" data-ctype="'+x.id+'"><option value="">未分类</option>'
+      +CTYPES.map(t=>'<option value="'+t+'"'+(x.type===t?" selected":"")+'>'+t+'</option>').join("")
+      +'</select></div></div>';
+    let lastG=null;
     clive.forEach(x=>{
       if(cFilter!=="全部"&&cFilter!==x.sess) return;
-      if(x.sess!==lastS){ h+='<div class="pgrp">📖 '+esc(sessLab(x.sess))+'</div>'; lastS=x.sess; }
-      h+='<div class="idea">'
-        +'<div class="ihead"><span class="when num">'+fmt(x.ts)+'</span><button class="del" data-hidecnote="'+x.id+'">删除</button></div>'
-        +'<div class="irow">'+(x.img?'<img class="thumb" src="'+x.img+'" alt="课堂照片" data-zoom2="'+x.id+'">':"")
-        +'<textarea data-cnote="'+x.id+'" placeholder="老师讲的要点、手法要领、工具型号…">'+esc(x.txt)+'</textarea></div>'
-        +'<div class="itags"><select class="csel" data-csess="'+x.id+'"><option value="">不标节次</option>'
-        +CSESS.map(s=>'<option value="'+s.v+'"'+(x.sess===s.v?" selected":"")+'>'+esc(s.lab)+'</option>').join("")
-        +'</select></div></div>';
+      if(cSort==="type"){
+        const g=x.type||"未分类";
+        if(g!==lastG){ h+='<div class="pgrp">'+(CTICO[g]||"❔")+" "+esc(g)+'</div>'; lastG=g; }
+      }
+      h+=noteCard(x);
     });
     if(cdead.length){
       h+='<details class="card" style="margin-top:10px"><summary class="trashhd">🗑 回收站（'+cdead.length+'）— 删掉的都在这，能放回来</summary>'
@@ -1921,21 +1943,22 @@ function exportCnotes(){
   try{
     const enc=new TextEncoder();
     const files=[],media=[],anchors=[];
-    let rows='<row r="1">'+xcell("A1","序号",1)+xcell("B1","节次 · 课程",1)+xcell("C1","记录时间",1)+xcell("D1","课堂笔记",1)+xcell("E1","照片",1)+"</row>";
+    let rows='<row r="1">'+xcell("A1","序号",1)+xcell("B1","节次 · 课程",1)+xcell("C1","类型",1)+xcell("D1","记录时间",1)+xcell("E1","课堂笔记",1)+xcell("F1","照片",1)+"</row>";
     live.forEach((x,i)=>{
       const r=i+2;
       rows+='<row r="'+r+'">'+xcell("A"+r,i+1,3)
         +xcell("B"+r,sessLab(x.sess),2)
-        +xcell("C"+r,fmt(x.ts),3)
-        +xcell("D"+r,(x.txt&&x.txt.trim())?x.txt:"",2)
-        +xcell("E"+r,x.img?"📷 见右侧照片":"",2)+"</row>";
+        +xcell("C"+r,ctypeLab(x.type),3)
+        +xcell("D"+r,fmt(x.ts),3)
+        +xcell("E"+r,(x.txt&&x.txt.trim())?x.txt:"",2)
+        +xcell("F"+r,x.img?"📷 见右侧照片":"",2)+"</row>";
       if(x.img){
         const u8=b64ToU8(x.img.split(",")[1]);
         const dm=imgDims(u8);
         const wpx=110, hpx=Math.max(60,Math.min(170,Math.round(dm.h/dm.w*110)));
         const n=media.length+1;
         files.push({name:"xl/media/image"+n+".jpeg",data:u8});
-        anchors.push('<xdr:oneCellAnchor><xdr:from><xdr:col>4</xdr:col><xdr:colOff>38100</xdr:colOff><xdr:row>'+(r-1)+'</xdr:row><xdr:rowOff>19050</xdr:rowOff></xdr:from>'
+        anchors.push('<xdr:oneCellAnchor><xdr:from><xdr:col>5</xdr:col><xdr:colOff>38100</xdr:colOff><xdr:row>'+(r-1)+'</xdr:row><xdr:rowOff>19050</xdr:rowOff></xdr:from>'
           +'<xdr:ext cx="'+(wpx*9525)+'" cy="'+(hpx*9525)+'"/>'
           +'<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="'+n+'" name="课堂照片'+n+'"/><xdr:cNvPicPr/></xdr:nvPicPr>'
           +'<xdr:blipFill><a:blip r:embed="rId'+n+'"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>'
@@ -1947,7 +1970,7 @@ function exportCnotes(){
     const NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
     const RS='xmlns="http://schemas.openxmlformats.org/package/2006/relationships"';
     const sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet '+NS+'>'
-      +'<cols><col min="1" max="1" width="6.5" customWidth="1"/><col min="2" max="2" width="26" customWidth="1"/><col min="3" max="3" width="15.5" customWidth="1"/><col min="4" max="4" width="72" customWidth="1"/><col min="5" max="5" width="17" customWidth="1"/></cols>'
+      +'<cols><col min="1" max="1" width="6.5" customWidth="1"/><col min="2" max="2" width="26" customWidth="1"/><col min="3" max="3" width="9" customWidth="1"/><col min="4" max="4" width="15.5" customWidth="1"/><col min="5" max="5" width="66" customWidth="1"/><col min="6" max="6" width="17" customWidth="1"/></cols>'
       +"<sheetData>"+rows+"</sheetData>"
       +(media.length?'<drawing r:id="rId1"/>':"")
       +"</worksheet>";
@@ -2290,6 +2313,15 @@ document.addEventListener("change",e=>{
   if(cs){
     const x=(S.cnotes||[]).find(i=>i.id===cs.dataset.csess);
     if(x){ x.sess=cs.value; save(); toast("这条归到「"+sessLab(cs.value)+"」了"); }
+    return;
+  }
+  const ct=e.target.closest("select[data-ctype]");
+  if(ct){
+    const x=(S.cnotes||[]).find(i=>i.id===ct.dataset.ctype);
+    if(x){
+      x.type=ct.value; save();
+      if((S.cSort||"new")==="type"){ const y=window.scrollY; renderNote(); fillNotes(); window.scrollTo(0,y); }
+    }
   }
 });
 
@@ -2723,6 +2755,8 @@ document.addEventListener("click", e=>{
   if(e.target.closest("#cxls")){ exportCnotes(); return; }
   const cflt=e.target.closest("[data-cfilter]");
   if(cflt){ cFilter=cflt.dataset.cfilter; renderNote(); fillNotes(); return; }
+  const cso=e.target.closest("[data-csort]");
+  if(cso){ S.cSort=cso.dataset.csort; save(); const cy=window.scrollY; renderNote(); fillNotes(); window.scrollTo(0,cy); return; }
   const hcn=e.target.closest("[data-hidecnote]");
   if(hcn){ const x=(S.cnotes||[]).find(i=>i.id===hcn.dataset.hidecnote); if(x) x.hidden=true; renderNote(); fillNotes(); save(); toast("删掉了，课程页底部回收站能放回来"); return; }
   const scn=e.target.closest("[data-showcnote]");
