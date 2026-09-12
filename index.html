@@ -162,6 +162,9 @@
   .irow textarea{flex:1;min-width:0;min-height:66px}
   .irow img.thumb{cursor:zoom-in}
   .itags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .csel{font:inherit;font-size:12px;color:var(--ink);background:#fff;border:1px solid var(--line);
+    border-radius:10px;padding:4px 8px;max-width:100%}
+  .trashhd{font-size:12.5px;color:var(--mute);cursor:pointer}
   .tag{font-size:11.5px;padding:3px 10px;border-radius:12px;border:1px solid var(--line);
     background:#FCFDFC;color:var(--mute);cursor:pointer;font:inherit}
   .tag.on{background:var(--turmeric-soft);border-color:#E8D9B4;color:var(--turmeric);font-weight:640}
@@ -432,10 +435,14 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-11.17";
+const BUILD="2026-09-12.1";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.1",c:[
+   "★ 课程页新增「📚 课堂笔记」：拍照 / 选图（一次多张，每张一条）或写文字，每条自动标上课节次（如「9/12 上午 · 第二天 · 卷物」），可改节次、可按节次筛选，照片点开看大图",
+   "★ 课堂笔记一键导出 Excel（.xlsx）：按节次分组、按时间排序，一条一行，文字 + 照片直接嵌在表格里，方便课后复习",
+   "删掉的笔记进课程页底部回收站，随时能放回来"]},
  {v:"2026-09-11.17",c:[
    "★ 灵感本标签细分菜系：日式 / 韩式 / 中式 / 泰式 / 亚洲融合 / 其他菜系（原「菜品」自动归入其他菜系），加上包装、设备、门头/装修、菜单、其他，共 11 类",
    "★ 圆形随手记球正下方新增方形浮游按钮（两个球永远上下对齐、拖圆球一起走）：点开「展会谈判提示词」面板，8 类话术按场景分好，点一句直接复制",
@@ -1767,6 +1774,26 @@ const COURSE=[
  {d:"第五天 · 刺身",am:"食材准备 · 盘饰准备 · 刺身酱油调配 · 杀草鱼 · 白萝卜丝备料 · 调制芥末 · 刺身制作",pm:"刺身讲解（料理店常用鱼、如何定价）· 各部位处理 · 每人杀半条三文鱼（仅限一次）· 三文鱼挑选与保存 · 花之恋 / 三文鱼分解 · 刺身盘饰与拼盘"},
  {d:"第六天 · 收尾",am:"玉子烧讲解与制作 · 食材准备",pm:"军舰寿司制作与练习 · 腐皮寿司制作 · 食材总结 · 复习 · 学员答疑与针对性练习"}
 ];
+/* 课堂笔记（2026-09-12 Lee 要求：随手记上课内容，按节次归档，可导出 Excel） */
+const CDATES=["9/11","9/12","9/13","9/14","9/15","9/16"];   /* 上课日期 ↔ COURSE 第几天 */
+const CSESS=[];
+CDATES.forEach((d,i)=>{ CSESS.push({v:d+"·上",lab:d+" 上午 · "+COURSE[i].d}); CSESS.push({v:d+"·下",lab:d+" 下午 · "+COURSE[i].d}); });
+function sessOrder(v){ const i=CSESS.findIndex(s=>s.v===v); return i<0?99:i; }
+function sessLab(v){ const s=CSESS.find(s=>s.v===v); return s?s.lab:(v||"未标节次"); }
+function nowSess(){
+  const d=new Date(); const key=(d.getMonth()+1)+"/"+d.getDate();
+  const idx=CDATES.indexOf(key); if(idx<0) return "";
+  return d.getHours()<13 ? CDATES[idx]+"·上" : CDATES[idx]+"·下";
+}
+const MAX_CNOTES=80;
+let cFilter="全部";
+function addCnote(img){
+  if(!Array.isArray(S.cnotes)) S.cnotes=[];
+  if(S.cnotes.filter(x=>!x.hidden).length>=MAX_CNOTES){ toast("课堂笔记到 "+MAX_CNOTES+" 条上限了，先导出 Excel，再删几条旧的"); return null; }
+  const id="c"+Date.now()+Math.random().toString(36).slice(2,6);
+  S.cnotes.push({id,ts:Date.now(),img:img||"",txt:"",sess:nowSess(),hidden:false});
+  return id;
+}
 function renderNote(){
   let h='<div class="banner ok"><b>写完就存</b><br>停止输入半秒后自动保存到这台设备，并每 5 分钟留一个可回滚的存档点。</div>';
   h+='<details class="card" style="margin-bottom:14px"><summary style="cursor:pointer;font-size:14.5px;font-weight:640">📋 寿司课程安排（6 天 · 上午 9:30–12:00 / 下午 14:00–18:00）· 点开看每天学什么</summary>'
@@ -1775,11 +1802,179 @@ function renderNote(){
       +'<div style="font-size:12.5px;color:var(--ink-2);line-height:1.55;margin-top:3px"><b style="color:var(--indigo)">下午</b> '+esc(c.pm)+'</div></div>').join("")
     +'<p style="font-size:12px;color:var(--mute);margin:12px 0 0;line-height:1.5">穿校服；课程可能按实际进度调整。做好笔记：<b>开店要用的工具规格 / 尺寸 / 品牌</b>，别到开店时不知道怎么买。贵重物品自己保管（可放柜子）。<b>9500 套餐</b>：寿司 6 天学完后，提前一天找王老师 / 刘老师约剩下的 4 天主食课。课程总价 <b>¥5980</b>（自付 ¥4000，合伙人 ¥1980）。</p>'
     +'</details>';
+
+  /* ---- 课堂笔记 ---- */
+  if(!Array.isArray(S.cnotes)) S.cnotes=[];
+  const clive=S.cnotes.filter(x=>!x.hidden).sort((a,b)=>sessOrder(a.sess)-sessOrder(b.sess)||(a.ts-b.ts));
+  const cdead=S.cnotes.filter(x=>x.hidden);
+  const cused=CSESS.filter(s=>clive.some(x=>x.sess===s.v));
+  h+='<div class="sechd"><h2>📚 课堂笔记'+(clive.length?"（"+clive.length+"）":"")+'</h2></div>';
+  h+='<div class="scanbar">'
+    +'<button class="scanbtn" id="cpick"><svg viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3.5"/></svg>拍照 / 选图</button>'
+    +'<button class="ghost" id="cnew">写一条</button>'
+    +'<button class="ghost" id="cxls">📊 导出 Excel</button></div>';
+  if(!clive.length){
+    h+='<div class="empty">上课随手记：老师讲的要点、手上的手法要领、工具的型号价格——<b>拍一张</b>或<b>写一句</b>，会自动标好是哪天哪节课。回去点「导出 Excel」，一条一行带照片，复习快。</div>';
+  }else{
+    h+='<div class="itags" style="margin:0 0 10px">'
+      +[{v:"全部"}].concat(cused).map(f=>'<button class="tag'+(cFilter===f.v?" on":"")+'" data-cfilter="'+f.v+'">'+(f.v==="全部"?"全部":f.v.replace("·"," "))+'</button>').join("")+'</div>';
+    let lastS=null;
+    clive.forEach(x=>{
+      if(cFilter!=="全部"&&cFilter!==x.sess) return;
+      if(x.sess!==lastS){ h+='<div class="pgrp">📖 '+esc(sessLab(x.sess))+'</div>'; lastS=x.sess; }
+      h+='<div class="idea">'
+        +'<div class="ihead"><span class="when num">'+fmt(x.ts)+'</span><button class="del" data-hidecnote="'+x.id+'">删除</button></div>'
+        +'<div class="irow">'+(x.img?'<img class="thumb" src="'+x.img+'" alt="课堂照片" data-zoom2="'+x.id+'">':"")
+        +'<textarea data-cnote="'+x.id+'" placeholder="老师讲的要点、手法要领、工具型号…"></textarea></div>'
+        +'<div class="itags"><select class="csel" data-csess="'+x.id+'"><option value="">不标节次</option>'
+        +CSESS.map(s=>'<option value="'+s.v+'"'+(x.sess===s.v?" selected":"")+'>'+esc(s.lab)+'</option>').join("")
+        +'</select></div></div>';
+    });
+    if(cdead.length){
+      h+='<details class="card" style="margin-top:10px"><summary class="trashhd">🗑 回收站（'+cdead.length+'）— 删掉的都在这，能放回来</summary>'
+        +cdead.map(x=>'<div class="ihead" style="margin:10px 0 0"><span class="when num">'+fmt(x.ts)+' · '+esc(sessLab(x.sess))+'</span><button class="mact" data-showcnote="'+x.id+'">放回来</button></div>').join("")
+        +'</details>';
+    }
+  }
+
   NOTES.forEach(n=>{
     h+='<div style="margin-bottom:16px"><div class="nlab"><b>'+esc(n[1])+'</b>'+(n[3]?'<span>'+esc(n[3])+'</span>':"")+'</div>'
       +'<textarea data-note="'+n[0]+'" placeholder="'+esc(n[2]||"记点什么…")+'"></textarea></div>';
   });
   document.getElementById("v-note").innerHTML=h;
+}
+
+/* ---------- 课堂笔记导出 Excel（纯 JS 生成 .xlsx，照片嵌入表格） ---------- */
+const XCT=(function(){const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c;}return t;})();
+function crc32(u8){let c=0xFFFFFFFF;for(let i=0;i<u8.length;i++)c=XCT[(c^u8[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function b64ToU8(b64){const bin=atob(b64);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;}
+function imgDims(u8){
+  try{
+    if(u8[0]===0xFF&&u8[1]===0xD8){
+      let i=2;
+      while(i<u8.length-9){
+        if(u8[i]!==0xFF){i++;continue;}
+        const m=u8[i+1];
+        if(m>=0xC0&&m<=0xCF&&m!==0xC4&&m!==0xC8&&m!==0xCC) return {h:(u8[i+5]<<8)|u8[i+6],w:(u8[i+7]<<8)|u8[i+8]};
+        i+=2+((u8[i+2]<<8)|u8[i+3]);
+      }
+    }else if(u8[0]===0x89&&u8[1]===0x50){
+      return {w:((u8[16]<<24|u8[17]<<16|u8[18]<<8|u8[19])>>>0),h:((u8[20]<<24|u8[21]<<16|u8[22]<<8|u8[23])>>>0)};
+    }
+  }catch(e){}
+  return {w:640,h:480};
+}
+function zipStore(files){
+  const enc=new TextEncoder(); const parts=[],central=[]; let off=0;
+  const d=new Date();
+  const dtime=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1);
+  const ddate=(((d.getFullYear()-1980)&0x7F)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+  files.forEach(f=>{
+    const nb=enc.encode(f.name), crc=crc32(f.data);
+    const lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);
+    lh.setUint16(10,dtime,true);lh.setUint16(12,ddate,true);
+    lh.setUint32(14,crc,true);lh.setUint32(18,f.data.length,true);lh.setUint32(22,f.data.length,true);
+    lh.setUint16(26,nb.length,true);
+    parts.push(new Uint8Array(lh.buffer),nb,f.data);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);
+    ch.setUint16(12,dtime,true);ch.setUint16(14,ddate,true);
+    ch.setUint32(16,crc,true);ch.setUint32(20,f.data.length,true);ch.setUint32(24,f.data.length,true);
+    ch.setUint16(28,nb.length,true);ch.setUint32(42,off,true);
+    central.push(new Uint8Array(ch.buffer),nb);
+    off+=30+nb.length+f.data.length;
+  });
+  const cdSize=central.reduce((s,u)=>s+u.length,0);
+  const eocd=new DataView(new ArrayBuffer(22));
+  eocd.setUint32(0,0x06054b50,true);eocd.setUint16(8,files.length,true);eocd.setUint16(10,files.length,true);
+  eocd.setUint32(12,cdSize,true);eocd.setUint32(16,off,true);
+  return new Blob(parts.concat(central,[new Uint8Array(eocd.buffer)]),
+    {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+}
+function xcell(ref,val,style){
+  const s=style?' s="'+style+'"':"";
+  if(val===""||val==null) return '<c r="'+ref+'"'+s+"/>";
+  if(typeof val==="number") return '<c r="'+ref+'"'+s+'><v>'+val+"</v></c>";
+  return '<c r="'+ref+'" t="inlineStr"'+s+'><is><t xml:space="preserve">'+esc(String(val))+"</t></is></c>";
+}
+const CX_STYLES='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
+ +'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+ +'<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts>'
+ +'<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF2A4C6B"/><bgColor indexed="64"/></patternFill></fill></fills>'
+ +'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFC9D2CE"/></left><right style="thin"><color rgb="FFC9D2CE"/></right><top style="thin"><color rgb="FFC9D2CE"/></top><bottom style="thin"><color rgb="FFC9D2CE"/></bottom><diagonal/></border></borders>'
+ +'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+ +'<cellXfs count="4">'
+ +'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+ +'<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center"/></xf>'
+ +'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'
+ +'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="top"/></xf>'
+ +'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+function exportCnotes(){
+  if(!Array.isArray(S.cnotes)) S.cnotes=[];
+  const live=S.cnotes.filter(x=>!x.hidden).sort((a,b)=>sessOrder(a.sess)-sessOrder(b.sess)||(a.ts-b.ts));
+  if(!live.length){ toast("还没有课堂笔记，先拍一张或写一条"); return; }
+  try{
+    const enc=new TextEncoder();
+    const files=[],media=[],anchors=[];
+    let rows='<row r="1">'+xcell("A1","序号",1)+xcell("B1","节次 · 课程",1)+xcell("C1","记录时间",1)+xcell("D1","课堂笔记",1)+xcell("E1","照片",1)+"</row>";
+    live.forEach((x,i)=>{
+      const r=i+2;
+      rows+='<row r="'+r+'">'+xcell("A"+r,i+1,3)
+        +xcell("B"+r,sessLab(x.sess),2)
+        +xcell("C"+r,fmt(x.ts),3)
+        +xcell("D"+r,(x.txt&&x.txt.trim())?x.txt:"",2)
+        +xcell("E"+r,x.img?"📷 见右侧照片":"",2)+"</row>";
+      if(x.img){
+        const u8=b64ToU8(x.img.split(",")[1]);
+        const dm=imgDims(u8);
+        const wpx=110, hpx=Math.max(60,Math.min(170,Math.round(dm.h/dm.w*110)));
+        const n=media.length+1;
+        files.push({name:"xl/media/image"+n+".jpeg",data:u8});
+        anchors.push('<xdr:oneCellAnchor><xdr:from><xdr:col>4</xdr:col><xdr:colOff>38100</xdr:colOff><xdr:row>'+(r-1)+'</xdr:row><xdr:rowOff>19050</xdr:rowOff></xdr:from>'
+          +'<xdr:ext cx="'+(wpx*9525)+'" cy="'+(hpx*9525)+'"/>'
+          +'<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="'+n+'" name="课堂照片'+n+'"/><xdr:cNvPicPr/></xdr:nvPicPr>'
+          +'<xdr:blipFill><a:blip r:embed="rId'+n+'"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>'
+          +'<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+(wpx*9525)+'" cy="'+(hpx*9525)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic>'
+          +"<xdr:clientData/></xdr:oneCellAnchor>");
+        media.push(1);
+      }
+    });
+    const NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+    const RS='xmlns="http://schemas.openxmlformats.org/package/2006/relationships"';
+    const sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet '+NS+'>'
+      +'<cols><col min="1" max="1" width="6.5" customWidth="1"/><col min="2" max="2" width="26" customWidth="1"/><col min="3" max="3" width="15.5" customWidth="1"/><col min="4" max="4" width="72" customWidth="1"/><col min="5" max="5" width="17" customWidth="1"/></cols>'
+      +"<sheetData>"+rows+"</sheetData>"
+      +(media.length?'<drawing r:id="rId1"/>':"")
+      +"</worksheet>";
+    files.push({name:"[Content_Types].xml",data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      +'<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+      +'<Default Extension="xml" ContentType="application/xml"/>'
+      +(media.length?'<Default Extension="jpeg" ContentType="image/jpeg"/>':"")
+      +'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+      +'<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+      +'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+      +(media.length?'<Override PartName="/xl/drawings/drawing1.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>':"")
+      +"</Types>")});
+    files.push({name:"_rels/.rels",data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships '+RS+'><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')});
+    files.push({name:"xl/workbook.xml",data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook '+NS+'><sheets><sheet name="课堂笔记" sheetId="1" r:id="rId1"/></sheets></workbook>')});
+    files.push({name:"xl/_rels/workbook.xml.rels",data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships '+RS+'><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>')});
+    files.push({name:"xl/styles.xml",data:enc.encode(CX_STYLES)});
+    files.push({name:"xl/worksheets/sheet1.xml",data:enc.encode(sheet)});
+    if(media.length){
+      files.push({name:"xl/drawings/drawing1.xml",data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+anchors.join("")+"</xdr:wsDr>")});
+      files.push({name:"xl/drawings/_rels/drawing1.xml.rels",data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships '+RS+'>'
+        +media.map((_,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image'+(i+1)+'.jpeg"/>').join("")
+        +"</Relationships>")});
+      files.push({name:"xl/worksheets/_rels/sheet1.xml.rels",data:enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships '+RS+'><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>')});
+    }
+    const blob=zipStore(files);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a"); a.href=url; a.download="课堂笔记-"+BUILD+".xlsx";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);
+    toast("Excel 导出了（"+live.length+" 条"+(media.length?" · "+media.length+" 张照片":"")+"）");
+  }catch(err){ toast("导出失败："+err.message); }
 }
 
 /* ---------- 存档 ---------- */
@@ -2074,14 +2269,25 @@ ipicker.addEventListener("change", async e=>{
     try{ thumb=await compress(f,420,0.5); }
     catch(err){ toast(err.message); continue; }
     if(pickTarget==="quick"){ pendingImgs.push(thumb); renderQImgs(); }
+    else if(pickTarget==="cnote"){
+      if(!addCnote(thumb)) return;
+      const y=window.scrollY; renderNote(); fillNotes(); window.scrollTo(0,y); save();
+    }
     else{
       if(!addIdea(thumb)) return;
       const y=window.scrollY; renderIdea(); fillNotes(); window.scrollTo(0,y); save();
     }
   }
-  if(pickTarget!=="quick") toast("存好了，写两句再走 —— 光有照片过几天就认不出来了");
+  if(pickTarget!=="quick"&&pickTarget!=="cnote") toast("存好了，写两句再走 —— 光有照片过几天就认不出来了");
 });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(quick.classList.contains("on")) qClose(); if(psheet.classList.contains("on")) pClose(); } });
+document.addEventListener("change",e=>{
+  const cs=e.target.closest("select[data-csess]");
+  if(cs){
+    const x=(S.cnotes||[]).find(i=>i.id===cs.dataset.csess);
+    if(x){ x.sess=cs.value; save(); toast("这条归到「"+sessLab(cs.value)+"」了"); }
+  }
+});
 
 /* ---------- 我加的事：存资料库数据表，手机和电脑实时同步 ---------- */
 const DATABASE_ID="b7pWJF5qPhqUofOD7oqb4p";
@@ -2502,6 +2708,23 @@ document.addEventListener("click", e=>{
   if(pcat){ pCat=pcat.dataset.pcat; renderPChips(); document.getElementById("plist").innerHTML=promptListHTML(pCat); return; }
   const pcp=e.target.closest("[data-pcopy]");
   if(pcp){ const pp=pcp.dataset.pcopy.split("|"); copyText(PROMPTS[+pp[0]].items[+pp[1]],"已复制，去微信粘贴或当面照着说"); return; }
+  if(e.target.closest("#cpick")){ pickTarget="cnote"; ipicker.click(); return; }
+  if(e.target.closest("#cnew")){
+    const id=addCnote(""); if(!id) return;
+    renderNote(); fillNotes(); save();
+    const ta=document.querySelector('textarea[data-cnote="'+id+'"]');
+    if(ta){ ta.focus(); ta.scrollIntoView({block:"center"}); }
+    return;
+  }
+  if(e.target.closest("#cxls")){ exportCnotes(); return; }
+  const cflt=e.target.closest("[data-cfilter]");
+  if(cflt){ cFilter=cflt.dataset.cfilter; renderNote(); fillNotes(); return; }
+  const hcn=e.target.closest("[data-hidecnote]");
+  if(hcn){ const x=(S.cnotes||[]).find(i=>i.id===hcn.dataset.hidecnote); if(x) x.hidden=true; renderNote(); fillNotes(); save(); toast("删掉了，课程页底部回收站能放回来"); return; }
+  const scn=e.target.closest("[data-showcnote]");
+  if(scn){ const x=(S.cnotes||[]).find(i=>i.id===scn.dataset.showcnote); if(x) x.hidden=false; renderNote(); fillNotes(); save(); return; }
+  const zcn=e.target.closest("[data-zoom2]");
+  if(zcn){ const x=(S.cnotes||[]).find(i=>i.id===zcn.dataset.zoom2); if(x&&x.img){ lightbox.querySelector("img").src=x.img; lightbox.classList.add("on"); } return; }
   const qt=e.target.closest("[data-qtag]");
   if(qt){ qTag = qTag===qt.dataset.qtag ? "" : qt.dataset.qtag; renderQTags(); return; }
   const qr=e.target.closest("[data-qrm]");
@@ -2603,6 +2826,8 @@ importer.addEventListener("change",e=>{
 document.addEventListener("input", e=>{
   const ta=e.target.closest("textarea[data-note]");
   if(ta){ S.notes[ta.dataset.note]=ta.value; grow(ta); save(); return; }
+  const cn=e.target.closest("textarea[data-cnote]");
+  if(cn){ const x=(S.cnotes||[]).find(i=>i.id===cn.dataset.cnote); if(x){ x.txt=cn.value; grow(cn); save(); } return; }
   const cf=e.target.closest("input[data-cf]");
   if(cf){
     const parts=cf.dataset.cf.split("|");
