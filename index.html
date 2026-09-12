@@ -435,10 +435,12 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.1";
+const BUILD="2026-09-12.2";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.2",c:[
+   "🐞 修复课堂笔记 bug：打的字其实一直有保存，但重新渲染（点筛选/改节次/加照片/重开 App）后输入框显示为空，看起来像没存——已修复，现在输入框始终回显已保存的内容"]},
  {v:"2026-09-12.1",c:[
    "★ 课程页新增「📚 课堂笔记」：拍照 / 选图（一次多张，每张一条）或写文字，每条自动标上课节次（如「9/12 上午 · 第二天 · 卷物」），可改节次、可按节次筛选，照片点开看大图",
    "★ 课堂笔记一键导出 Excel（.xlsx）：按节次分组、按时间排序，一条一行，文字 + 照片直接嵌在表格里，方便课后复习",
@@ -1825,7 +1827,7 @@ function renderNote(){
       h+='<div class="idea">'
         +'<div class="ihead"><span class="when num">'+fmt(x.ts)+'</span><button class="del" data-hidecnote="'+x.id+'">删除</button></div>'
         +'<div class="irow">'+(x.img?'<img class="thumb" src="'+x.img+'" alt="课堂照片" data-zoom2="'+x.id+'">':"")
-        +'<textarea data-cnote="'+x.id+'" placeholder="老师讲的要点、手法要领、工具型号…"></textarea></div>'
+        +'<textarea data-cnote="'+x.id+'" placeholder="老师讲的要点、手法要领、工具型号…">'+esc(x.txt)+'</textarea></div>'
         +'<div class="itags"><select class="csel" data-csess="'+x.id+'"><option value="">不标节次</option>'
         +CSESS.map(s=>'<option value="'+s.v+'"'+(x.sess===s.v?" selected":"")+'>'+esc(s.lab)+'</option>').join("")
         +'</select></div></div>';
