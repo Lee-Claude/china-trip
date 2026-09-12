@@ -208,6 +208,13 @@
     font-size:14px;line-height:1.5}
   .pline:active{background:var(--indigo-soft)}
   .pline .pico{flex:none;color:var(--indigo);font-size:15px;padding-left:4px}
+  .arow{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin:0 0 8px}
+  .arow .ainfo{flex:1;min-width:0}
+  .arow .ainfo b{display:block;font-size:14px}
+  .arow .ainfo span{display:block;font-size:12px;color:var(--mute);margin-top:2px;word-break:break-all}
+  .arow .abtns{display:flex;gap:6px;flex:none}
+  .arow .tag{cursor:pointer}
   #promptCard{margin:0 0 12px}
   #promptCard summary{cursor:pointer;font-weight:700;font-size:14.5px;list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   #promptCard summary::-webkit-details-marker{display:none}
@@ -395,6 +402,17 @@
   </div>
 </div>
 
+<div class="quick" id="asheet">
+  <div class="mask" id="amask"></div>
+  <div class="sheet">
+    <h4>📍 地址簿<span>点「高德」→ 系统确认 → 直接拉起高德 App</span></h4>
+    <div id="ablist"></div>
+    <div class="qrow">
+      <button class="ghost" style="flex:1" id="acancel">关闭</button>
+    </div>
+  </div>
+</div>
+
 <nav data-page-node-id="04yHFyDTfqLcQsDOgLTEOo">
   <button class="on" data-v="trip" data-page-node-id="L1WQJd58dhyge13om9nNru"><svg viewBox="0 0 24 24" data-page-node-id="7C9BBTukhIEEBKOSaPZlSt"><path d="M4 6h16M4 12h16M4 18h10" data-page-node-id="PayFU5IWDYpfIRf2sjxCTi"/><circle cx="19" cy="18" r="2" data-page-node-id="jcsau3VoHuInoJy9BFvXfp"/></svg>行程</button>
   <button data-v="stay" data-page-node-id="rp3PIeVO5xavNlYIh4IkLx"><svg viewBox="0 0 24 24" data-page-node-id="l5dgsNdgBHanxAnEE7nfuF"><path d="M3 20V9l9-5 9 5v11" data-page-node-id="GiZHkZdQ0CPGMCUHVTLRDR"/><path d="M9 20v-6h6v6" data-page-node-id="mdiX0H8FEYE3jjOnSRiAge"/></svg>住宿</button>
@@ -435,10 +453,14 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.5";
+const BUILD="2026-09-12.6";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.6",c:[
+   "★ 新增「📍 地址簿」：行程页 + 展会页都有入口，11 个重要地址（广州 / 长沙 / 回程）集中一处，分组列好",
+   "★ 全部地址一键直拉高德 App：点「高德」→ 系统弹一次「是否打开高德地图」→ 确认直接进 App 导航，不再在浏览器网页里绕；行程里原有的地图按钮也全部改成直拉 App",
+   "海外地址（法兰克福机场）自动走 Google 地图；没拉起高德时地址自动复制，粘到任何地图 App 都能用"]},
  {v:"2026-09-12.5",c:[
    "★ 新增「✍️ 写当天笔记」：一点就直接开写，自动归到今天这节课（今天没写字的那条会直接拿来用，不会记出一堆空条）",
    "★ 新增「📝 总结」：今天 / 全程 6 天一键总结——KPI、按类型分布、全部内容带照片；可导出一份带照片的总结 HTML 文件，发给合伙人或存档都行"]},
@@ -797,12 +819,64 @@ function mapHref(addr){
 }
 function mapBtn(addr){
   if(!addr||addr==="—") return "";
-  return '<a class="ghost wide" href="'+mapHref(addr)+'" target="_blank" rel="noopener"'
+  return '<a class="ghost wide" href="'+mapHref(addr)+'" target="_blank" rel="noopener" data-mgo="'+esc(addr)+'"'
     +' style="margin-top:10px;text-decoration:none;display:block;text-align:center">📍 打开地图（'+(isChinaAddr(addr)?"高德":"Google")+'）导航到这个地址</a>';
 }
 function mapChip(addr){
   if(!addr||addr==="—") return "";
-  return '<a class="mapchip" href="'+mapHref(addr)+'" target="_blank" rel="noopener">📍 '+(isChinaAddr(addr)?"高德":"Google")+' 导航</a>';
+  return '<a class="mapchip" href="'+mapHref(addr)+'" target="_blank" rel="noopener" data-mgo="'+esc(addr)+'">📍 '+(isChinaAddr(addr)?"高德":"Google")+' 导航</a>';
+}
+/* 直拉高德 App（2026-09-12 Lee：不想再从浏览器网页中转）——走 App 协议，系统会问一次「是否打开高德地图」，确认即进 App；
+   桌面端 / 非中文地址照旧开网页版；2 秒后页面还在（没装 App 或取消了）就把地址复制到剪贴板兜底 */
+function amapScheme(clean){
+  const kw=encodeURIComponent(clean);
+  const ua=navigator.userAgent;
+  if(/iphone|ipad|ipod/i.test(ua)) return "iosamap://search?sourceApplication=chinatrip&keyword="+kw;
+  if(/android/i.test(ua)) return "androidamap://search?sourceApplication=chinatrip&keyword="+kw;
+  return null;
+}
+function openMap(addr,gmap){
+  const clean=String(addr||"").replace(/[（(].*?[)）]/g,"").replace(/\s+/g," ").trim();
+  if(!clean) return;
+  const useG=gmap||!isChinaAddr(clean);
+  if(useG){ window.open("https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(clean),"_blank"); return; }
+  const scheme=amapScheme(clean);
+  if(!scheme){ window.open(mapHref(addr),"_blank"); return; }
+  const t0=Date.now();
+  setTimeout(function(){
+    if(document.visibilityState==="visible"&&Date.now()-t0<4000)
+      copyText(addr,"高德没拉起来？地址已复制，粘到地图 App 也能用");
+  },2200);
+  window.location.href=scheme;
+}
+
+/* ---------- 地址簿（2026-09-12 Lee：重要地址集中一处，一键拉起高德） ---------- */
+const AB=[
+ {g:"广州 · 中食展 9/10–9/12",n:"广交会展馆 B 区（中食展）",a:"海珠区阅江中路 382 号"},
+ {g:"广州 · 中食展 9/10–9/12",n:"琶洲酒店（磨碟沙地铁站 B 口）",a:"海珠区新港东路 37 号"},
+ {g:"广州 · 中食展 9/10–9/12",n:"广州南站（9/11 晚高铁去长沙）",a:"广州南站"},
+ {g:"长沙 · 上课 9/12–9/16",n:"濑户料理学院（上课）",a:"开福区黄兴北路 89 号 上城金都·国际公馆 南栋 1425 室"},
+ {g:"长沙 · 上课 9/12–9/16",n:"林夕居酒店（住到 9/17）",a:"开福区黄兴北路华润置地中心 T5 栋 106 门面"},
+ {g:"长沙 · 食餐会 9/18–9/20",n:"一百米酒店（9/17–9/20）",a:"雨花区东山街道雨花大道高铁南站东广场北栋一楼"},
+ {g:"长沙 · 食餐会 9/18–9/20",n:"长沙国际会展中心（食餐会）",a:"长沙县国展路 118 号 长沙国际会展中心"},
+ {g:"长沙 · 食餐会 9/18–9/20",n:"长沙南站（9/20 晚 G695）",a:"长沙南站"},
+ {g:"交通 · 回程",n:"香港西九龙站（高铁）",a:"香港西九龙站"},
+ {g:"交通 · 回程",n:"容桂站（9/20 晚 C7727，朋友接）",a:"顺德区容桂站"},
+ {g:"交通 · 回程",n:"法兰克福机场 T3（9/24 回德国）",a:"Frankfurt Airport Terminal 3",gmap:1}
+];
+function abHTML(){
+  let lastG=null;
+  return AB.map((x,i)=>{
+    const g=x.g!==lastG?'<div class="pgrp">'+esc(x.g)+"</div>":"";
+    lastG=x.g;
+    return g+'<div class="arow"><div class="ainfo"><b>'+esc(x.n)+'</b><span>'+esc(x.a)+'</span></div>'
+      +'<span class="abtns"><button class="tag'+(x.gmap?"":" on")+'" data-aopen="'+i+'">'+(x.gmap?"Google":"高德")+'</button>'
+      +'<button class="tag" data-acopy="'+i+'">复制</button></span></div>';
+  }).join("");
+}
+function openAddr(){
+  document.getElementById("ablist").innerHTML=abHTML();
+  document.getElementById("asheet").classList.add("on");
 }
 
 const VOUCH=[
@@ -1053,7 +1127,8 @@ function renderTrip(){
   h+='</div><div class="sechd"><h2>出发前要办完的事</h2><span style="display:flex;gap:6px;align-items:center">'
     +'<button class="addchip" id="mtAdd">＋ 加事</button>'
     +'<button class="chip'+(grid?" on":"")+'" data-grid="1">'+(grid?"单列":"多列")+'</button>'
-    +'<button class="chip'+(!hideDone?" on":"")+'" data-hide="1">'+(hideDone?("显示已完成 "+doneN):"隐藏已完成")+'</button></span></div>';
+    +'<button class="chip'+(!hideDone?" on":"")+'" data-hide="1">'+(hideDone?("显示已完成 "+doneN):"隐藏已完成")+'</button>'
+    +'<button class="chip" data-ab="1">📍 地址簿</button></span></div>';
 
   const pv=PREP.filter(p=>pass(p[3],p[0]));
   h+= pv.length ? '<div class="items'+G+'">'+pv.map(p=>row(p[0],"",p[1],p[2],p[3])).join("")+'</div>'
@@ -1363,7 +1438,8 @@ function renderExpo(){
   let h='<div class="scanbar">'
     +'<button class="scanbtn" id="scan"><svg viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M7 12h10"/></svg>拍照 / 选图</button>'
     +'<button class="ghost" id="manual">手填一张</button>'
-    +'<button class="ghost" id="export">导出</button></div>';
+    +'<button class="ghost" id="export">导出</button>'
+    +'<button class="ghost" data-ab="1">📍 地址簿</button></div>';
 
   h+='<h2 class="sec">📋 展会作战清单（勾完自动存，进度跟着你）</h2><div class="card">'
     +'<div class="xbar"><i id="expoBar"></i></div>'
@@ -2844,6 +2920,15 @@ document.addEventListener("click", e=>{
   if(pcat){ pCat=pcat.dataset.pcat; renderPChips(); document.getElementById("plist").innerHTML=promptListHTML(pCat); return; }
   const pcp=e.target.closest("[data-pcopy]");
   if(pcp){ const pp=pcp.dataset.pcopy.split("|"); copyText(PROMPTS[+pp[0]].items[+pp[1]],"已复制，去微信粘贴或当面照着说"); return; }
+  /* 地址簿 + 直拉高德 App（2026-09-12） */
+  const mgo=e.target.closest("[data-mgo]");
+  if(mgo){ e.preventDefault(); openMap(mgo.dataset.mgo); return; }
+  if(e.target.closest("[data-ab]")){ openAddr(); return; }
+  if(e.target.closest("#amask")||e.target.closest("#acancel")){ document.getElementById("asheet").classList.remove("on"); return; }
+  const aop=e.target.closest("[data-aopen]");
+  if(aop){ document.getElementById("asheet").classList.remove("on"); const ab=AB[+aop.dataset.aopen]; openMap(ab.a,ab.gmap); return; }
+  const acp=e.target.closest("[data-acopy]");
+  if(acp){ const ab2=AB[+acp.dataset.acopy]; copyText(ab2.n+"："+ab2.a,"地址已复制"); return; }
   if(e.target.closest("#cpick")){ pickTarget="cnote"; ipicker.click(); return; }
   if(e.target.closest("#ctoday")){ cnoteOpenToday(); return; }
   if(e.target.closest("#csum")){ cnoteSumToggle(); return; }
