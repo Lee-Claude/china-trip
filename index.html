@@ -142,6 +142,22 @@
   .twrap .thumb{display:block}
   .trot{position:absolute;top:3px;right:3px;width:26px;height:26px;border-radius:50%;border:none;background:rgba(20,24,32,.62);color:#fff;font-size:13px;line-height:26px;text-align:center;padding:0;cursor:pointer;z-index:2;-webkit-tap-highlight-color:transparent}
   .trot:active{background:rgba(20,24,32,.88)}
+  .tdel{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;border:none;background:rgba(20,24,32,.62);color:#fff;font-size:11px;line-height:22px;text-align:center;padding:0;cursor:pointer;z-index:2;-webkit-tap-highlight-color:transparent}
+  .cimgs{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start}
+  .cimgs .thumb{width:96px;height:72px}
+  .extra{display:flex;gap:7px;align-items:center;margin-top:7px}
+  .extra .when{flex:0 0 auto;font-size:11px;color:var(--mute)}
+  .extra input.f{flex:1;min-width:0;font-size:13px;padding:7px 9px}
+  .extra .del{flex:0 0 auto}
+  .idea.cmerge{cursor:pointer;transition:box-shadow .15s}
+  .idea.cmerge .thumb{width:72px;height:54px}
+  .idea.cmerge.msel{outline:2px solid var(--turmeric);box-shadow:0 0 0 4px rgba(184,128,28,.12)}
+  .mtick{font-size:11.5px;color:var(--mute);flex:0 0 auto}
+  .msel .mtick{color:var(--turmeric);font-weight:640}
+  #cmergebar{position:fixed;left:12px;right:12px;bottom:calc(64px + env(safe-area-inset-bottom));z-index:60;display:flex;gap:8px;align-items:center;background:var(--ink);color:#fff;border-radius:14px;padding:10px 12px;box-shadow:0 6px 22px rgba(0,0,0,.28)}
+  #cmergebar b{flex:1;font-size:13.5px}
+  #cmergebar .scanbtn{flex:0 0 auto}
+  #cmergebar .ghost{flex:0 0 auto;background:transparent;border-color:rgba(255,255,255,.4);color:#fff}
   .cfields{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
   .crow{display:flex;gap:6px}
   .crow input.f{flex:1;min-width:0}
@@ -457,10 +473,14 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.7";
+const BUILD="2026-09-12.8";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.8",c:[
+   "★ 课堂笔记组化：每条卡片下面有「＋ 照片」「＋ 备注」——照片可以继续往同一条里加，组成一组多图；备注一条条追加，带时间，可删",
+   "★ 新增「⧉ 合并」：点开挑选模式，把几条散记点选成一堆，一键合成一组——照片全并进去，文字变成组里的补充备注，散条自动消失",
+   "每张照片右上角 ↻ 转正、左上角 ✕ 拿掉；Excel 导出和总结都按组来：一条一组，照片全在，备注文字并进同一格"]},
  {v:"2026-09-12.7",c:[
    "★ 照片能旋转了：课堂笔记 / 灵感本 / 名片的照片右上角都有「↻」，点一下顺时针转 90°，转到正为止；转完直接存进记录，Excel 导出、总结、放大看全是正的"]},
  {v:"2026-09-12.6",c:[
@@ -843,6 +863,41 @@ function rotApply(list,id,after){
     if(!nd){ toast("这张转不动，重新拍一张吧"); return; }
     x.img=nd; save(); after();
   });
+}
+/* 课堂笔记组内按索引转（imgs[]） */
+function rotApplyIdx(id,idx,after){
+  const x=(S.cnotes||[]).find(i=>i.id===id);
+  if(!x||!Array.isArray(x.imgs)||!x.imgs[idx]){ toast("照片不见了"); return; }
+  const key=id+"#"+idx;
+  if(ROTBUSY[key]) return;
+  ROTBUSY[key]=1;
+  toast("转 90°…");
+  rotImg(x.imgs[idx],function(nd){
+    delete ROTBUSY[key];
+    if(!nd){ toast("这张转不动，重新拍一张吧"); return; }
+    x.imgs[idx]=nd; save(); after();
+  });
+}
+/* 合并挑选的若干条为一组：照片全并、文字进补充备注，单独条目消失 */
+function cMergeDo(){
+  const sel=(S.cMergeSel||[]).slice();
+  if(sel.length<2){ toast("先挑至少两条"); return; }
+  const picked=(S.cnotes||[]).filter(x=>sel.indexOf(x.id)>=0&&!x.hidden).sort((a,b)=>a.ts-b.ts);
+  if(picked.length<2){ toast("先挑至少两条"); return; }
+  if(!confirm("把这 "+picked.length+" 条合成一组？照片和备注全部并进第一条，单独的条目会消失")) return;
+  const base=picked[0];
+  if(!Array.isArray(base.imgs)) base.imgs=[];
+  if(!Array.isArray(base.extras)) base.extras=[];
+  const mixedSess=picked.some(x=>(x.sess||"")!==(base.sess||""));
+  picked.slice(1).forEach(x=>{
+    (x.imgs||[]).forEach(im=>base.imgs.push(im));
+    if(String(x.txt||"").trim()) base.extras.push({id:"e"+Date.now()+Math.random().toString(36).slice(2,6),txt:String(x.txt).trim(),ts:x.ts});
+    (x.extras||[]).forEach(e2=>base.extras.push(e2));
+  });
+  S.cnotes=S.cnotes.filter(x=>sel.indexOf(x.id)<0||x.id===base.id);
+  S.cMergeMode=false; S.cMergeSel=[];
+  renderNote(); fillNotes(); save();
+  toast("合成一组了："+base.imgs.length+" 张照片"+(mixedSess?" · 节次不一样，先按第一条的来，要改点下拉":""));
 }
 
 function isChinaAddr(addr){
@@ -1915,8 +1970,16 @@ function addCnote(img){
   if(!Array.isArray(S.cnotes)) S.cnotes=[];
   if(S.cnotes.filter(x=>!x.hidden).length>=MAX_CNOTES){ toast("课堂笔记到 "+MAX_CNOTES+" 条上限了，先导出 Excel，再删几条旧的"); return null; }
   const id="c"+Date.now()+Math.random().toString(36).slice(2,6);
-  S.cnotes.push({id,ts:Date.now(),img:img||"",txt:"",sess:nowSess(),type:"",hidden:false});
+  S.cnotes.push({id,ts:Date.now(),imgs:img?[img]:[],txt:"",extras:[],sess:nowSess(),type:"",hidden:false});
   return id;
+}
+/* 往已有条目追加照片（2026-09-12 Lee：一条笔记可以是一组多图） */
+function cnoteAddImg(id,img){
+  const x=(S.cnotes||[]).find(i=>i.id===id);
+  if(!x) return false;
+  if(!Array.isArray(x.imgs)) x.imgs=x.img?[x.img]:[];
+  x.imgs.push(img);
+  return true;
 }
 /* 笔记类型（2026-09-12 Lee：可按类型归类排序） */
 const CTYPES=["配料","物料","刀工","手法","摆盘","设备","其他"];
@@ -1946,7 +2009,7 @@ function cnoteSumData(){
   const live=(scope==="today"?all.filter(x=>x.ts>=startOfToday()):all.slice())
     .sort((a,b)=>ctypeOrder(a.type)-ctypeOrder(b.type)||(a.ts-b.ts));
   const byType={}; let imgs=0;
-  live.forEach(x=>{ const t=x.type||"未分类"; byType[t]=(byType[t]||0)+1; if(x.img) imgs++; });
+  live.forEach(x=>{ const t=x.type||"未分类"; byType[t]=(byType[t]||0)+1; imgs+=(x.imgs||[]).length; });
   const sessions=new Set(live.map(x=>x.sess||"未标节次")).size;
   const scopeLab=scope==="today"?(function(){const d=new Date();return "今天 "+(d.getMonth()+1)+"/"+d.getDate();})():"全程 6 天课";
   return {scope,live,byType,imgs,sessions,scopeLab};
@@ -1962,8 +2025,10 @@ function cnoteSumHTML(withBtn){
     '<div class="sumgrp"><b>'+(CTICO[t]||"❔")+" "+esc(t)+"（"+D.live.filter(x=>(x.type||"未分类")===t).length+'）</b>'
     +D.live.filter(x=>(x.type||"未分类")===t).map(x=>
       '<div class="idea" style="margin-top:8px"><div class="ihead"><span class="when num">'+fmt(x.ts)+" · "+esc(sessLab(x.sess))+"</span></div>"
-      +'<div class="irow">'+(x.img?'<img class="thumb" src="'+x.img+'" alt="课堂照片">':"")
-      +'<div style="flex:1;min-width:0;font-size:14px;white-space:pre-wrap;word-break:break-word">'+esc(x.txt&&x.txt.trim()?x.txt:"（只有照片）")+"</div></div></div>").join("")
+      +((x.imgs||[]).length?'<div class="cimgs">'+x.imgs.map(im=>'<img class="thumb" src="'+im+'" alt="课堂照片">').join("")+'</div>':"")
+      +'<div style="flex:1;min-width:0;font-size:14px;white-space:pre-wrap;word-break:break-word'+(((x.imgs||[]).length)?"":";margin-top:0")+'">'+esc(x.txt&&x.txt.trim()?x.txt:"（只有照片）")+"</div>"
+      +(x.extras||[]).filter(e2=>String(e2.txt||"").trim()).map(e2=>'<p class="meta" style="margin:5px 0 0;white-space:pre-wrap">'+esc(fmt(e2.ts)+" · "+String(e2.txt).trim())+"</p>").join("")
+      +"</div></div>").join("")
     +"</div>").join("");
   return '<div class="sumbox"><div class="sumh" style="margin:0 0 8px">课堂总结 · '+esc(D.scopeLab)+" · 共 "+D.live.length+" 条</div>"
     +'<div class="itags" style="margin:0 0 4px"><button class="tag'+(D.scope==="today"?" on":"")+'" data-csumscope="today">今天</button>'
@@ -2000,6 +2065,7 @@ function cnoteSummaryExport(){
     +'.idea{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:11px;margin:8px 0 0}'
     +'.ihead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:7px}.ihead .when{font-size:11.5px;color:var(--mute)}'
     +'.irow{display:flex;gap:11px;align-items:flex-start}.irow img.thumb{width:110px;height:82px;object-fit:cover;border-radius:9px;border:1px solid var(--line);cursor:zoom-in}'
+    +'.cimgs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}.cimgs .thumb{width:96px;height:72px;object-fit:cover;border-radius:9px;border:1px solid var(--line)}'
     +'.itags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.tag{border:1px solid var(--line);background:#fff;border-radius:12px;font-size:12px;padding:3px 10px;color:var(--ink2)}'
     +'.tag.on{background:var(--indigo);color:#fff;border-color:var(--indigo)}'
     +'.ghost{border:1px solid var(--line);background:#fff;border-radius:12px;font-size:13.5px;padding:9px 12px;color:var(--ink)}'
@@ -2028,6 +2094,15 @@ function renderNote(){
 
   /* ---- 课堂笔记 ---- */
   if(!Array.isArray(S.cnotes)) S.cnotes=[];
+  /* 组化迁移（2026-09-12）：img→imgs[]，补 extras；一次跑完 */
+  if(S.cnoteMig2!==1){
+    S.cnotes.forEach(x=>{
+      if(!Array.isArray(x.imgs)) x.imgs=x.img?[x.img]:[];
+      if(x.img!==undefined) delete x.img;
+      if(!Array.isArray(x.extras)) x.extras=[];
+    });
+    S.cnoteMig2=1; save();
+  }
   const cSort=S.cSort||"new";
   const cAll=S.cnotes.filter(x=>!x.hidden);
   const clive=(cSort==="type")
@@ -2049,27 +2124,54 @@ function renderNote(){
     h+='<div class="itags" style="margin:0 0 6px">'
       +'<button class="tag'+(cSort==="new"?" on":"")+'" data-csort="new">⏷ 最新在上</button>'
       +'<button class="tag'+(cSort==="old"?" on":"")+'" data-csort="old">⏶ 最新在下</button>'
-      +'<button class="tag'+(cSort==="type"?" on":"")+'" data-csort="type">🗂 按类型</button></div>';
+      +'<button class="tag'+(cSort==="type"?" on":"")+'" data-csort="type">🗂 按类型</button>'
+      +'<button class="tag'+(S.cMergeMode?" on":"")+'" data-cmergetoggle="1">⧉ 合并</button></div>';
     h+='<div class="itags" style="margin:0 0 10px">'
       +[{v:"全部"}].concat(cused).map(f=>'<button class="tag'+(cFilter===f.v?" on":"")+'" data-cfilter="'+f.v+'">'+(f.v==="全部"?"全部":f.v.replace("·"," "))+'</button>').join("")+'</div>';
-    const noteCard=x=>'<div class="idea">'
-      +'<div class="ihead"><span class="when num">'+fmt(x.ts)+'</span><button class="del" data-hidecnote="'+x.id+'">删除</button></div>'
-      +'<div class="irow">'+(x.img?'<span class="twrap"><img class="thumb" src="'+x.img+'" alt="课堂照片" data-zoom2="'+x.id+'"><button class="trot" data-crot="'+x.id+'" title="旋转 90°">↻</button></span>':"")
-      +'<textarea data-cnote="'+x.id+'" placeholder="老师讲的要点、手法要领、工具型号…">'+esc(x.txt)+'</textarea></div>'
-      +'<div class="itags"><select class="csel" data-csess="'+x.id+'"><option value="">不标节次</option>'
-      +CSESS.map(s=>'<option value="'+s.v+'"'+(x.sess===s.v?" selected":"")+'>'+esc(s.lab)+'</option>').join("")
-      +'</select><select class="csel" data-ctype="'+x.id+'"><option value="">未分类</option>'
-      +CTYPES.map(t=>'<option value="'+t+'"'+(x.type===t?" selected":"")+'>'+t+'</option>').join("")
-      +'</select></div></div>';
+    /* 照片组：一张图保持左图右字；多张图排在上面一排（2026-09-12 组化） */
+    const imgOne=(x,i)=>'<span class="twrap"><img class="thumb" src="'+x.imgs[i]+'" alt="课堂照片" data-zoom2="'+x.id+"|"+i+'">'
+      +'<button class="trot" data-crot="'+x.id+"|"+i+'" title="旋转 90°">↻</button>'
+      +'<button class="tdel" data-cdel="'+x.id+"|"+i+'" title="拿掉这张照片">✕</button></span>';
+    const selArr=S.cMergeSel||[];
+    const mergeCard=x=>{
+      const brief=(String(x.txt||"").trim()+" "+(x.extras||[]).map(e2=>String(e2.txt||"").trim()).filter(Boolean).join(" ")).slice(0,60);
+      return '<div class="idea cmerge'+(selArr.indexOf(x.id)>=0?" msel":"")+'" data-mergep="'+x.id+'">'
+        +'<div class="ihead"><span class="when num">'+fmt(x.ts)+" · "+esc(sessLab(x.sess))+'</span><span class="mtick">'+(selArr.indexOf(x.id)>=0?"✓ 已选":"点这选")+'</span></div>'
+        +((x.imgs||[]).length?'<div class="cimgs">'+x.imgs.map(im=>'<img class="thumb" src="'+im+'" alt="">').join("")+'</div>':'<p class="meta" style="margin:6px 0 0">（无照片）</p>')
+        +'<p class="meta" style="margin:6px 0 0;white-space:pre-wrap;word-break:break-word">'+esc(brief||"（没写字）")+'</p></div>';
+    };
+    const noteCard=x=>{
+      const n=(x.imgs||[]).length;
+      const imgs=n===1?imgOne(x,0):'<div class="cimgs">'+x.imgs.map((im,i)=>imgOne(x,i)).join("")+'</div>';
+      const extras=(x.extras||[]).map(e2=>'<div class="extra"><span class="when num">'+fmt(e2.ts)+'</span><input class="f" data-cextra="'+x.id+"|"+e2.id+'" value="'+esc(e2.txt)+'" placeholder="补充备注…"><button class="del" data-cexdel="'+x.id+"|"+e2.id+'">✕</button></div>').join("");
+      return '<div class="idea">'
+        +'<div class="ihead"><span class="when num">'+fmt(x.ts)+'</span><button class="del" data-hidecnote="'+x.id+'">删除</button></div>'
+        +(n===1?'<div class="irow">'+imgs:'<div>'+imgs)
+        +(n===1?'<textarea data-cnote="'+x.id+'" placeholder="老师讲的要点、手法要领、工具型号…">'+esc(x.txt)+'</textarea></div>'
+               :'<textarea data-cnote="'+x.id+'" style="margin-top:9px" placeholder="老师讲的要点、手法要领、工具型号…">'+esc(x.txt)+'</textarea>')
+        +extras
+        +'<div class="itags"><button class="tag" data-caddimg="'+x.id+'">＋ 照片</button>'
+        +'<button class="tag" data-caddtxt="'+x.id+'">＋ 备注</button>'
+        +'<select class="csel" data-csess="'+x.id+'"><option value="">不标节次</option>'
+        +CSESS.map(s=>'<option value="'+s.v+'"'+(x.sess===s.v?" selected":"")+'>'+esc(s.lab)+'</option>').join("")
+        +'</select><select class="csel" data-ctype="'+x.id+'"><option value="">未分类</option>'
+        +CTYPES.map(t=>'<option value="'+t+'"'+(x.type===t?" selected":"")+'>'+t+'</option>').join("")
+        +'</select></div></div>';
+    };
     let lastG=null;
     clive.forEach(x=>{
       if(cFilter!=="全部"&&cFilter!==x.sess) return;
-      if(cSort==="type"){
+      if(!S.cMergeMode&&cSort==="type"){
         const g=x.type||"未分类";
         if(g!==lastG){ h+='<div class="pgrp">'+(CTICO[g]||"❔")+" "+esc(g)+'</div>'; lastG=g; }
       }
-      h+=noteCard(x);
+      h+=S.cMergeMode?mergeCard(x):noteCard(x);
     });
+    if(S.cMergeMode){
+      h+='<div id="cmergebar"><b>'+(S.cMergeSel||[]).length+' 条已选</b>'
+        +'<button class="scanbtn" id="cmergeok">⧉ 合成一组</button>'
+        +'<button class="ghost" id="cmergecancel">取消</button></div>';
+    }
     if(cdead.length){
       h+='<details class="card" style="margin-top:10px"><summary class="trashhd">🗑 回收站（'+cdead.length+'）— 删掉的都在这，能放回来</summary>'
         +cdead.map(x=>'<div class="ihead" style="margin:10px 0 0"><span class="when num">'+fmt(x.ts)+' · '+esc(sessLab(x.sess))+'</span><button class="mact" data-showcnote="'+x.id+'">放回来</button></div>').join("")
@@ -2158,28 +2260,33 @@ function exportCnotes(){
     const enc=new TextEncoder();
     const files=[],media=[],anchors=[];
     let rows='<row r="1">'+xcell("A1","序号",1)+xcell("B1","节次 · 课程",1)+xcell("C1","类型",1)+xcell("D1","记录时间",1)+xcell("E1","课堂笔记",1)+xcell("F1","照片",1)+"</row>";
+    let rc=2;
     live.forEach((x,i)=>{
-      const r=i+2;
+      const r=rc; rc++;
+      const exTxt=(x.extras||[]).filter(e2=>String(e2.txt||"").trim()).map(e2=>fmt(e2.ts)+" "+String(e2.txt).trim()).join("\n");
+      const eAll=[(x.txt&&x.txt.trim())?String(x.txt).trim():"",exTxt].filter(Boolean).join("\n");
       rows+='<row r="'+r+'">'+xcell("A"+r,i+1,3)
         +xcell("B"+r,sessLab(x.sess),2)
         +xcell("C"+r,ctypeLab(x.type),3)
         +xcell("D"+r,fmt(x.ts),3)
-        +xcell("E"+r,(x.txt&&x.txt.trim())?x.txt:"",2)
-        +xcell("F"+r,x.img?"📷 见右侧照片":"",2)+"</row>";
-      if(x.img){
-        const u8=b64ToU8(x.img.split(",")[1]);
+        +xcell("E"+r,eAll,2)
+        +xcell("F"+r,((x.imgs||[]).length?("📷 "+x.imgs.length+" 张，见右侧"):""),2)+"</row>";
+      (x.imgs||[]).forEach((im,ii)=>{
+        const rr=rc; rc++;
+        if(ii>0) rows+='<row r="'+rr+'"></row>';
+        const u8=b64ToU8(im.split(",")[1]);
         const dm=imgDims(u8);
         const wpx=110, hpx=Math.max(60,Math.min(170,Math.round(dm.h/dm.w*110)));
         const n=media.length+1;
         files.push({name:"xl/media/image"+n+".jpeg",data:u8});
-        anchors.push('<xdr:oneCellAnchor><xdr:from><xdr:col>5</xdr:col><xdr:colOff>38100</xdr:colOff><xdr:row>'+(r-1)+'</xdr:row><xdr:rowOff>19050</xdr:rowOff></xdr:from>'
+        anchors.push('<xdr:oneCellAnchor><xdr:from><xdr:col>5</xdr:col><xdr:colOff>38100</xdr:colOff><xdr:row>'+(rr-1)+'</xdr:row><xdr:rowOff>19050</xdr:rowOff></xdr:from>'
           +'<xdr:ext cx="'+(wpx*9525)+'" cy="'+(hpx*9525)+'"/>'
           +'<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="'+n+'" name="课堂照片'+n+'"/><xdr:cNvPicPr/></xdr:nvPicPr>'
           +'<xdr:blipFill><a:blip r:embed="rId'+n+'"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>'
           +'<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+(wpx*9525)+'" cy="'+(hpx*9525)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic>'
           +"<xdr:clientData/></xdr:oneCellAnchor>");
         media.push(1);
-      }
+      });
     });
     const NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
     const RS='xmlns="http://schemas.openxmlformats.org/package/2006/relationships"';
@@ -2510,6 +2617,12 @@ ipicker.addEventListener("change", async e=>{
     try{ thumb=await compress(f,420,0.5); }
     catch(err){ toast(err.message); continue; }
     if(pickTarget==="quick"){ pendingImgs.push(thumb); renderQImgs(); }
+    else if(pickTarget&&typeof pickTarget==="object"&&pickTarget.mode==="cnote"){
+      const y0=window.scrollY;
+      if(!cnoteAddImg(pickTarget.id,thumb)){ pickTarget="cnote"; if(!addCnote(thumb)) return; }
+      else toast("照片已加进这一组");
+      renderNote(); fillNotes(); window.scrollTo(0,y0); save();
+    }
     else if(pickTarget==="cnote"){
       if(!addCnote(thumb)) return;
       const y=window.scrollY; renderNote(); fillNotes(); window.scrollTo(0,y); save();
@@ -2519,7 +2632,8 @@ ipicker.addEventListener("change", async e=>{
       const y=window.scrollY; renderIdea(); fillNotes(); window.scrollTo(0,y); save();
     }
   }
-  if(pickTarget!=="quick"&&pickTarget!=="cnote") toast("存好了，写两句再走 —— 光有照片过几天就认不出来了");
+  const tg=pickTarget;
+  if(tg!=="quick"&&tg!=="cnote"&&!(tg&&typeof tg==="object"&&tg.mode==="cnote")) toast("存好了，写两句再走 —— 光有照片过几天就认不出来了");
 });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if(quick.classList.contains("on")) qClose(); if(psheet.classList.contains("on")) pClose(); } });
 document.addEventListener("change",e=>{
@@ -2967,13 +3081,66 @@ document.addEventListener("click", e=>{
   if(aop){ document.getElementById("asheet").classList.remove("on"); const ab=AB[+aop.dataset.aopen]; openMap(ab.a,ab.gmap); return; }
   const acp=e.target.closest("[data-acopy]");
   if(acp){ const ab2=AB[+acp.dataset.acopy]; copyText(ab2.n+"："+ab2.a,"地址已复制"); return; }
-  /* 照片旋转（2026-09-12）：课堂笔记 / 灵感本 / 名片，点一下顺时针转 90° */
+  /* 照片旋转（2026-09-12）：课堂笔记（组内索引）/ 灵感本 / 名片，点一下顺时针转 90° */
   const rtb=e.target.closest("[data-crot],[data-irot],[data-crot2]");
   if(rtb){
-    if(rtb.dataset.crot) rotApply(S.cnotes,rtb.dataset.crot,renderNote);
+    if(rtb.dataset.crot){
+      const rp=rtb.dataset.crot.split("|");
+      if(rp.length>1) rotApplyIdx(rp[0],+rp[1],renderNote);
+      else rotApply(S.cnotes,rtb.dataset.crot,renderNote);
+    }
     else if(rtb.dataset.irot) rotApply(S.ideas,rtb.dataset.irot,renderIdea);
     else rotApply(S.cards,rtb.dataset.crot2,renderExpo);
     return;
+  }
+  /* 课堂笔记组操作（2026-09-12）：加照片 / 加备注 / 删照片 / 删备注 / 合并 */
+  const cai=e.target.closest("[data-caddimg]");
+  if(cai){ pickTarget={mode:"cnote",id:cai.dataset.caddimg}; ipicker.click(); return; }
+  const cat=e.target.closest("[data-caddtxt]");
+  if(cat){
+    const x=(S.cnotes||[]).find(i=>i.id===cat.dataset.caddtxt);
+    if(x){
+      if(!Array.isArray(x.extras)) x.extras=[];
+      const eid="e"+Date.now()+Math.random().toString(36).slice(2,6);
+      x.extras.push({id:eid,txt:"",ts:Date.now()});
+      renderNote(); save();
+      const inp=document.querySelector('input[data-cextra="'+x.id+"|"+eid+'"]');
+      if(inp){ inp.focus(); inp.scrollIntoView({block:"center"}); }
+    }
+    return;
+  }
+  const cxd=e.target.closest("[data-cexdel]");
+  if(cxd){
+    const p=cxd.dataset.cexdel.split("|");
+    const x=(S.cnotes||[]).find(i=>i.id===p[0]);
+    if(x&&Array.isArray(x.extras)){
+      x.extras=x.extras.filter(e2=>e2.id!==p[1]);
+      renderNote(); save(); toast("备注删了");
+    }
+    return;
+  }
+  const cdl=e.target.closest("[data-cdel]");
+  if(cdl){
+    const p=cdl.dataset.cdel.split("|");
+    const x=(S.cnotes||[]).find(i=>i.id===p[0]);
+    if(x&&Array.isArray(x.imgs)){
+      x.imgs.splice(+p[1],1);
+      renderNote(); save(); toast("照片拿掉了");
+    }
+    return;
+  }
+  const cmt=e.target.closest("[data-cmergetoggle]");
+  if(cmt){ S.cMergeMode=!S.cMergeMode; S.cMergeSel=[]; renderNote(); return; }
+  if(e.target.closest("#cmergeok")){ cMergeDo(); return; }
+  if(e.target.closest("#cmergecancel")){ S.cMergeMode=false; S.cMergeSel=[]; renderNote(); return; }
+  if(S.cMergeMode){
+    const mp=e.target.closest("[data-mergep]");
+    if(mp){
+      const arr=S.cMergeSel||(S.cMergeSel=[]);
+      const ix=arr.indexOf(mp.dataset.mergep);
+      if(ix>=0) arr.splice(ix,1); else arr.push(mp.dataset.mergep);
+      renderNote(); return;
+    }
   }
   if(e.target.closest("#cpick")){ pickTarget="cnote"; ipicker.click(); return; }
   if(e.target.closest("#ctoday")){ cnoteOpenToday(); return; }
@@ -3003,7 +3170,7 @@ document.addEventListener("click", e=>{
   const scn=e.target.closest("[data-showcnote]");
   if(scn){ const x=(S.cnotes||[]).find(i=>i.id===scn.dataset.showcnote); if(x) x.hidden=false; renderNote(); fillNotes(); save(); return; }
   const zcn=e.target.closest("[data-zoom2]");
-  if(zcn){ const x=(S.cnotes||[]).find(i=>i.id===zcn.dataset.zoom2); if(x&&x.img){ lightbox.querySelector("img").src=x.img; lightbox.classList.add("on"); } return; }
+  if(zcn){ const zp=zcn.dataset.zoom2.split("|"); const x=(S.cnotes||[]).find(i=>i.id===zp[0]); const src=x?(Array.isArray(x.imgs)?(x.imgs[+zp[1]||0]):(x.img||null)):null; if(src){ lightbox.querySelector("img").src=src; lightbox.classList.add("on"); } return; }
   const qt=e.target.closest("[data-qtag]");
   if(qt){ qTag = qTag===qt.dataset.qtag ? "" : qt.dataset.qtag; renderQTags(); return; }
   const qr=e.target.closest("[data-qrm]");
@@ -3107,6 +3274,14 @@ document.addEventListener("input", e=>{
   if(ta){ S.notes[ta.dataset.note]=ta.value; grow(ta); save(); return; }
   const cn=e.target.closest("textarea[data-cnote]");
   if(cn){ const x=(S.cnotes||[]).find(i=>i.id===cn.dataset.cnote); if(x){ x.txt=cn.value; grow(cn); save(); } return; }
+  const cx=e.target.closest("input[data-cextra]");
+  if(cx){
+    const p=cx.dataset.cextra.split("|");
+    const x=(S.cnotes||[]).find(i=>i.id===p[0]);
+    const e2=x&&Array.isArray(x.extras)?x.extras.find(v=>v.id===p[1]):null;
+    if(e2){ e2.txt=cx.value; save(); }
+    return;
+  }
   const cf=e.target.closest("input[data-cf]");
   if(cf){
     const parts=cf.dataset.cf.split("|");
