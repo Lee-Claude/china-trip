@@ -435,10 +435,13 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.4";
+const BUILD="2026-09-12.5";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.5",c:[
+   "★ 新增「✍️ 写当天笔记」：一点就直接开写，自动归到今天这节课（今天没写字的那条会直接拿来用，不会记出一堆空条）",
+   "★ 新增「📝 总结」：今天 / 全程 6 天一键总结——KPI、按类型分布、全部内容带照片；可导出一份带照片的总结 HTML 文件，发给合伙人或存档都行"]},
  {v:"2026-09-12.4",c:[
    "★ 课堂笔记排序三模式：「⏷ 最新在上」「⏶ 最新在下」「🗂 按类型」——按类型时分成 配料 / 物料 / 刀工 / 手法 / 摆盘 / 设备 / 其他 七类，组内按上课时间正序",
    "★ 每条笔记加了类型下拉（和节次并排），选好类型自动归组；导出 Excel 也加了「类型」列"]},
@@ -1806,6 +1809,100 @@ const CTYPES=["配料","物料","刀工","手法","摆盘","设备","其他"];
 const CTICO={"配料":"🧂","物料":"🛒","刀工":"🔪","手法":"🤲","摆盘":"🍽️","设备":"🛠️","其他":"📦","未分类":"❔"};
 function ctypeOrder(t){ const i=CTYPES.indexOf(t); return i<0?99:i; }
 function ctypeLab(t){ return t||"未分类"; }
+function startOfToday(){ const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(); }
+/* 写当天笔记：今天该节次里没写字的那条直接拿来写，没有就新建一条并聚焦 */
+function cnoteOpenToday(){
+  if(!Array.isArray(S.cnotes)) S.cnotes=[];
+  const sess=nowSess();
+  let x=[...S.cnotes].reverse().find(n=>!n.hidden&&n.sess===sess&&!String(n.txt||"").trim()&&n.ts>=startOfToday());
+  if(!x){
+    const id=addCnote(""); if(!id) return;
+    x=S.cnotes.find(n=>n.id===id);
+    if(sess&&x) x.sess=sess;
+  }
+  renderNote(); fillNotes(); save();
+  const ta=document.querySelector('textarea[data-cnote="'+x.id+'"]');
+  if(ta){ ta.focus(); ta.scrollIntoView({block:"center"}); }
+  toast(sess?"写吧 —— 自动归到「"+sessLab(sess)+"」":"写吧 —— 记得在下面选个节次");
+}
+/* 课堂总结：今天 / 全程，KPI + 类型分布 + 全部内容带照片，可导出 HTML */
+function cnoteSumData(){
+  const scope=S.cSumScope||"today";
+  const all=(S.cnotes||[]).filter(x=>!x.hidden);
+  const live=(scope==="today"?all.filter(x=>x.ts>=startOfToday()):all.slice())
+    .sort((a,b)=>ctypeOrder(a.type)-ctypeOrder(b.type)||(a.ts-b.ts));
+  const byType={}; let imgs=0;
+  live.forEach(x=>{ const t=x.type||"未分类"; byType[t]=(byType[t]||0)+1; if(x.img) imgs++; });
+  const sessions=new Set(live.map(x=>x.sess||"未标节次")).size;
+  const scopeLab=scope==="today"?(function(){const d=new Date();return "今天 "+(d.getMonth()+1)+"/"+d.getDate();})():"全程 6 天课";
+  return {scope,live,byType,imgs,sessions,scopeLab};
+}
+function cnoteSumHTML(withBtn){
+  const D=cnoteSumData();
+  if(!D.live.length) return '<p class="meta" style="margin:6px 0">'+(D.scope==="today"?"今天还没记，点上面「✍️ 写当天笔记」来一条。":"课堂笔记还是空的。")+'</p>';
+  const types=CTYPES.concat(["未分类"]);
+  const maxN=Math.max(1,...Object.values(D.byType));
+  const bars=types.filter(t=>D.byType[t]).map(t=>
+    '<div class="ibar"><span class="ilab">'+(CTICO[t]||"❔")+" "+esc(t)+'</span><span class="itrack"><i style="width:'+Math.round(D.byType[t]/maxN*100)+'%"></i></span><span class="inum">'+D.byType[t]+"</span></div>").join("");
+  const cards=types.filter(t=>D.live.some(x=>(x.type||"未分类")===t)).map(t=>
+    '<div class="sumgrp"><b>'+(CTICO[t]||"❔")+" "+esc(t)+"（"+D.live.filter(x=>(x.type||"未分类")===t).length+'）</b>'
+    +D.live.filter(x=>(x.type||"未分类")===t).map(x=>
+      '<div class="idea" style="margin-top:8px"><div class="ihead"><span class="when num">'+fmt(x.ts)+" · "+esc(sessLab(x.sess))+"</span></div>"
+      +'<div class="irow">'+(x.img?'<img class="thumb" src="'+x.img+'" alt="课堂照片">':"")
+      +'<div style="flex:1;min-width:0;font-size:14px;white-space:pre-wrap;word-break:break-word">'+esc(x.txt&&x.txt.trim()?x.txt:"（只有照片）")+"</div></div></div>").join("")
+    +"</div>").join("");
+  return '<div class="sumbox"><div class="sumh" style="margin:0 0 8px">课堂总结 · '+esc(D.scopeLab)+" · 共 "+D.live.length+" 条</div>"
+    +'<div class="itags" style="margin:0 0 4px"><button class="tag'+(D.scope==="today"?" on":"")+'" data-csumscope="today">今天</button>'
+    +'<button class="tag'+(D.scope==="all"?" on":"")+'" data-csumscope="all">全程 6 天</button></div>'
+    +'<div class="sumkpis">'
+    +'<div class="sumkpi"><b class="num">'+D.live.length+"</b><span>条笔记</span></div>"
+    +'<div class="sumkpi"><b class="num">'+D.imgs+"</b><span>张照片</span></div>"
+    +'<div class="sumkpi"><b class="num">'+D.sessions+"</b><span>个节次</span></div>"
+    +'<div class="sumkpi"><b class="num">'+Object.keys(D.byType).length+"</b><span>个类型</span></div></div>"
+    +'<div class="sumh">按类型分布</div>'+bars
+    +(withBtn?'<button class="ghost wide" id="csumExp" style="margin-top:12px">📄 导出总结文件（带照片，发给谁都能看）</button>':"")
+    +'<div style="margin-top:6px">'+cards+"</div></div>";
+}
+function cnoteSumToggle(){
+  const box=document.getElementById("cnoteSum"); if(!box) return;
+  S.cSumOpen=!S.cSumOpen; save();
+  box.style.display=S.cSumOpen?"block":"none";
+  if(S.cSumOpen) box.innerHTML=cnoteSumHTML(true);
+}
+function cnoteSummaryExport(){
+  const D=cnoteSumData();
+  if(!D.live.length){ toast((D.scope==="today"?"今天":"全程")+"还没有笔记"); return; }
+  const css=':root{--card:#fff;--line:#E3DED2;--ink:#1F2A28;--ink2:#4A5A56;--mute:#7A8A85;--paper:#F4F1EA;--indigo:#2A4C6B;--indigo-soft:#E8EEF4;--turmeric:#B8801C}'
+    +'body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.65 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;padding:16px 12px 50px}'
+    +'.wrap{max-width:720px;margin:0 auto}h1{font-size:20px;margin:4px 0 2px}.sub{color:var(--mute);font-size:12.5px;margin:0 0 14px}'
+    +'.sumbox{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 14px}'
+    +'.sumkpis{display:flex;gap:10px;margin-bottom:4px}.sumkpi{flex:1;text-align:center;background:var(--indigo-soft);border-radius:11px;padding:11px 6px}'
+    +'.sumkpi b{display:block;font-size:23px;line-height:1.15;color:var(--indigo)}.sumkpi span{font-size:11.5px;color:var(--mute)}'
+    +'.sumh{font-size:13px;font-weight:640;color:var(--ink);margin:15px 0 8px}'
+    +'.ibar{display:flex;align-items:center;gap:8px;margin:6px 0}.ibar .ilab{flex:0 0 78px;font-size:12.5px;color:var(--ink2);text-align:right}'
+    +'.ibar .itrack{flex:1;height:14px;background:var(--line);border-radius:7px;overflow:hidden}.ibar .itrack i{display:block;height:100%;background:var(--turmeric);border-radius:7px;min-width:2px}'
+    +'.ibar .inum{flex:0 0 24px;font-size:12px;color:var(--mute);text-align:right}'
+    +'.sumgrp{border-top:1px dashed var(--line);padding:9px 0}.sumgrp b{font-size:13px;color:var(--ink)}'
+    +'.idea{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:11px;margin:8px 0 0}'
+    +'.ihead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:7px}.ihead .when{font-size:11.5px;color:var(--mute)}'
+    +'.irow{display:flex;gap:11px;align-items:flex-start}.irow img.thumb{width:110px;height:82px;object-fit:cover;border-radius:9px;border:1px solid var(--line);cursor:zoom-in}'
+    +'.itags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.tag{border:1px solid var(--line);background:#fff;border-radius:12px;font-size:12px;padding:3px 10px;color:var(--ink2)}'
+    +'.tag.on{background:var(--indigo);color:#fff;border-color:var(--indigo)}'
+    +'.ghost{border:1px solid var(--line);background:#fff;border-radius:12px;font-size:13.5px;padding:9px 12px;color:var(--ink)}'
+    +'.foot{margin-top:18px;font-size:12px;color:var(--mute);border-top:1px solid var(--line);padding-top:10px}';
+  const doc="<!DOCTYPE html><html lang=\"zh-CN\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+    +"<title>课堂总结 · "+esc(D.scopeLab)+"</title><style>"+css+"</style></head><body><div class=\"wrap\">"
+    +"<h1>课堂总结 · "+esc(D.scopeLab)+"</h1><p class=\"sub\">濑户料理学院 寿司课 · "+BUILD+" · 导出于 "+fmt(Date.now())+"</p>"
+    +cnoteSumHTML(false)
+    +'<div class="foot">📱 同类文件：课堂笔记 Excel（App 内导出）· 资料库《寿司课6天笔记库》</div>'
+    +"</div></body></html>";
+  const blob=new Blob([doc],{type:"text/html;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="课堂总结-"+(D.scope==="today"?"今天":"全程")+"-"+BUILD+".html";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),4000);
+  toast("总结文件导出了（"+D.live.length+" 条 · "+D.imgs+" 张照片）");
+}
 function renderNote(){
   let h='<div class="banner ok"><b>写完就存</b><br>停止输入半秒后自动保存到这台设备，并每 5 分钟留一个可回滚的存档点。</div>';
   h+='<details class="card" style="margin-bottom:14px"><summary style="cursor:pointer;font-size:14.5px;font-weight:640">📋 寿司课程安排（6 天 · 上午 9:30–12:00 / 下午 14:00–18:00）· 点开看每天学什么</summary>'
@@ -1826,9 +1923,12 @@ function renderNote(){
   const cused=CSESS.filter(s=>cAll.some(x=>x.sess===s.v));
   h+='<div class="sechd"><h2>📚 课堂笔记'+(cAll.length?"（"+cAll.length+"）":"")+'</h2></div>';
   h+='<div class="scanbar">'
+    +'<button class="scanbtn" id="ctoday">✍️ 写当天笔记</button>'
     +'<button class="scanbtn" id="cpick"><svg viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3.5"/></svg>拍照 / 选图</button>'
     +'<button class="ghost" id="cnew">写一条</button>'
-    +'<button class="ghost" id="cxls">📊 导出 Excel</button></div>';
+    +'<button class="ghost" id="csum">📝 总结</button>'
+    +'<button class="ghost" id="cxls">📊 Excel</button></div>'
+    +'<div id="cnoteSum" style="display:'+(S.cSumOpen?"block":"none")+'">'+(S.cSumOpen?cnoteSumHTML():"")+'</div>';
   if(!cAll.length){
     h+='<div class="empty">上课随手记：老师讲的要点、手上的手法要领、工具的型号价格——<b>拍一张</b>或<b>写一句</b>，会自动标好是哪天哪节课。回去点「导出 Excel」，一条一行带照片，复习快。</div>';
   }else{
@@ -2745,6 +2845,16 @@ document.addEventListener("click", e=>{
   const pcp=e.target.closest("[data-pcopy]");
   if(pcp){ const pp=pcp.dataset.pcopy.split("|"); copyText(PROMPTS[+pp[0]].items[+pp[1]],"已复制，去微信粘贴或当面照着说"); return; }
   if(e.target.closest("#cpick")){ pickTarget="cnote"; ipicker.click(); return; }
+  if(e.target.closest("#ctoday")){ cnoteOpenToday(); return; }
+  if(e.target.closest("#csum")){ cnoteSumToggle(); return; }
+  if(e.target.closest("#csumExp")){ cnoteSummaryExport(); return; }
+  const cssc=e.target.closest("[data-csumscope]");
+  if(cssc){
+    S.cSumScope=cssc.dataset.csumscope; save();
+    const box=document.getElementById("cnoteSum");
+    if(box&&S.cSumOpen) box.innerHTML=cnoteSumHTML(true);
+    return;
+  }
   if(e.target.closest("#cnew")){
     const id=addCnote(""); if(!id) return;
     renderNote(); fillNotes(); save();
