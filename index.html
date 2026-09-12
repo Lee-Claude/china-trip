@@ -168,6 +168,12 @@
   #cmergebar .ghost{flex:0 0 auto;background:transparent;border-color:rgba(255,255,255,.4);color:#fff}
   #updbar{position:fixed;top:0;left:0;right:0;z-index:200;background:var(--alert);color:#fff;font-size:13.5px;font-weight:640;text-align:center;padding:10px 12px calc(10px + env(safe-area-inset-top));cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25)}
   #updbar b{margin-left:4px;text-decoration:underline}
+  /* 常驻刷新按钮（2026-09-12 Lee：任何页面右下角都要有，一键刷到最新） */
+  #rbtn{position:fixed;right:12px;bottom:calc(var(--tabh) + 14px + env(safe-area-inset-bottom));z-index:55;width:44px;height:44px;border-radius:22px;border:1px solid var(--line);background:rgba(255,255,255,.95);box-shadow:0 3px 13px rgba(20,32,29,.18);display:grid;place-items:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;transition:transform .12s}
+  #rbtn:active{transform:scale(.92)}
+  #rbtn svg{width:20px;height:20px;stroke:var(--indigo);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  #rbtn.spin svg{animation:rbspin .7s linear infinite}
+  @keyframes rbspin{to{transform:rotate(360deg)}}
   .cfields{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
   .crow{display:flex;gap:6px}
   .crow input.f{flex:1;min-width:0}
@@ -453,6 +459,8 @@
   <button data-v="safe" data-page-node-id="RaLfi7p5z58eHRXwEksHio"><svg viewBox="0 0 24 24" data-page-node-id="bJdSiqtumLuW0GbY344ENQ"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" data-page-node-id="9NB3BvibcLkH2Yv6utCsps"/><path d="M9 12l2 2 4-4" data-page-node-id="PduPXjko8zV301WzPFrPFk"/></svg>存档</button>
 </nav>
 
+<button id="rbtn" title="刷新到最新版（清缓存重新拉取）" aria-label="刷新到最新版"><svg viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6"/><path d="M20.5 4v5h-5"/></svg></button>
+
 <input type="file" id="picker" accept="image/*" multiple hidden data-page-node-id="fnpVvGDqOzAGylx7l4wyoS">
 <input type="file" id="ipicker" accept="image/*" multiple hidden data-page-node-id="ideaPick001">
 <input type="file" id="importer" accept="application/json,.json" hidden data-page-node-id="7jkMUTMEkusd7BlesmE2WG">
@@ -483,10 +491,12 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.10";
+const BUILD="2026-09-12.11";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-12.11",c:[
+   "★ 右下角常驻「↻ 刷新」按钮：不管在哪一页都能看到，点一下 = 清掉缓存 + 重新拉取最新版，一秒钟拿到最新状态（以前那种「手机上还是旧版」的情况，点它就解决）"]},
  {v:"2026-09-12.10",c:[
    "★ 每张照片配自己的图注：每组照片按「一张图 + 紧跟它的说明」从上到下列好，条理一眼看清；图上照旧 ↻ 转正、✕ 拿掉",
    "★ 合并时文字自动归位：被合并的每条，它原来写的文字直接变成它那张照片的图注（没照片的才进整组备注），照片连图注一起排进新组",
@@ -3099,6 +3109,7 @@ function renderExp(){
 
 /* ---------- 事件 ---------- */
 document.addEventListener("click", e=>{
+  if(e.target.closest("#rbtn")){ hardRefresh(); return; }
   const zoom=e.target.closest("[data-zoom]");
   if(zoom){
     const x=S.ideas.find(i=>i.id===zoom.dataset.zoom);
@@ -3384,6 +3395,33 @@ function autoLanding(now){
 
 if("serviceWorker" in navigator && location.protocol==="https:"){
   navigator.serviceWorker.register("sw.js").catch(()=>{});
+}
+
+/* 一键刷新到最新（2026-09-12 Lee：任何页面右下角常驻按钮）：
+   先尽量清掉 Service Worker 与 Cache Storage，再带着新的随机参数重载当前页——浏览器视为新地址，
+   HTTP 缓存也一起吃不到旧版，拿到的必定是线上最新 */
+function hardRefresh(){
+  const bt=document.getElementById("rbtn");
+  if(bt) bt.classList.add("spin");
+  toast("正在刷新到最新版…");
+  let done=false;
+  function once(){
+    if(done) return; done=true;
+    try{ location.replace(location.pathname+"?r="+Date.now()+(location.hash||"")); }
+    catch(e){ try{ location.href=location.pathname+"?r="+Date.now(); }catch(e2){} }
+  }
+  try{
+    if(navigator.serviceWorker&&navigator.serviceWorker.getRegistrations){
+      navigator.serviceWorker.getRegistrations().then(function(rs){
+        return Promise.all(rs.map(function(r){ return r.unregister(); }));
+      }).catch(function(){}).then(function(){
+        if(window.caches&&caches.keys) return caches.keys().then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); });
+      }).catch(function(){}).then(once);
+      setTimeout(once,700);
+      return;
+    }
+  }catch(e){}
+  once();
 }
 
 /* 新版本自检（2026-09-12）：启动 3 秒后静默拉一次线上版本号，比本机旧就在顶部挂「刷新更新」横幅。
