@@ -168,6 +168,11 @@
   #cmergebar .ghost{flex:0 0 auto;background:transparent;border-color:rgba(255,255,255,.4);color:#fff}
   #updbar{position:fixed;top:0;left:0;right:0;z-index:200;background:var(--alert);color:#fff;font-size:13.5px;font-weight:640;text-align:center;padding:10px 12px calc(10px + env(safe-area-inset-top));cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.25)}
   #updbar b{margin-left:4px;text-decoration:underline}
+  /* 存储告警条（2026-09-14）：存不下/快满时常驻顶部，点一下直达存档页 */
+  #quotabar{position:fixed;top:0;left:0;right:0;z-index:210;color:#fff;font-size:13px;font-weight:640;line-height:1.5;text-align:center;padding:9px 14px calc(9px + env(safe-area-inset-top));cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.28)}
+  #quotabar.qred{background:var(--alert)}
+  #quotabar.qwarn{background:#A8801A}
+  #quotabar b{text-decoration:underline}
   /* 常驻刷新按钮（2026-09-12 Lee：任何页面右下角都要有，一键刷到最新） */
   #rbtn{position:fixed;right:12px;bottom:calc(var(--tabh) + 14px + env(safe-area-inset-bottom));z-index:55;width:44px;height:44px;border-radius:22px;border:1px solid var(--line);background:rgba(255,255,255,.95);box-shadow:0 3px 13px rgba(20,32,29,.18);display:grid;place-items:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;transition:transform .12s}
   #rbtn:active{transform:scale(.92)}
@@ -507,10 +512,16 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-12.14";
+const BUILD="2026-09-14.15";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-14.15",c:[
+   "🛠 重要修复（9/14 丢课记）：手机存储写满后，新记的内容会存不进去、而且没有任何提示，一刷新就退回旧内容。现在存不下会立刻在顶部挂红条，引导导出备份 + 一键瘦身",
+   "★ 存档页新增「存储体检」：当前占用多少 MB（上限约 5MB）、照片几张、笔记几条、问师傅几行，还能看到你现在是从哪个入口打开的（换入口 = 换一份数据）",
+   "★ 新增「🧹 一键瘦身」：把已存的大图重新压小腾空间，文字和结构不动（建议先导出备份再瘦身）",
+   "★ 新增「从粘贴的文字恢复」：手机上选文件麻烦，直接把之前复制的备份文字粘进框里就能恢复",
+   "存储用到 3MB 会黄条提醒、4MB 红条提醒，不会再悄悄写满"]},
  {v:"2026-09-12.14",c:[
    "★ 地址簿复制补全省市区： Lee 9/12 复制长沙地址寄快递，因为没写「湖南省长沙市」被寄到了安徽同名地址。现在地址簿 11 个地址全部带省+市+区，复制出去直接贴快递单不会再跨省；高德没拉起来时的兜底复制也换成了完整地址"]},
  {v:"2026-09-12.13",c:[
@@ -1207,12 +1218,14 @@ const LS=(()=>{ try{ localStorage.setItem("__probe","1"); localStorage.removeIte
 const AS=(!LS && typeof window!=="undefined" && window.storage) ? window.storage : null;
 
 async function kGet(k){
-  if(LS){ return localStorage.getItem(k); }
+  if(LS){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
   if(AS){ try{ const r=await AS.get(k); return r?r.value:null; }catch(e){ return null; } }
   return MEM[k]||null;
 }
+/* 2026-09-14 关键修复：setItem 在存储满时会抛异常，以前没接住 → 静默失败、内容没存上却毫无提示
+   （Lee 9/14 丢了两天的课记，就是这个）。现在一律返回 false，交给 save() 报警。 */
 async function kSet(k,v){
-  if(LS){ localStorage.setItem(k,v); return true; }
+  if(LS){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
   if(AS){ try{ return !!(await AS.set(k,v)); }catch(e){ return false; } }
   MEM[k]=v; return true;
 }
@@ -1249,12 +1262,51 @@ async function load(){
 }
 
 let st=null, lastSnap=0;
+/* ---------- 存储水位（2026-09-14 修复 Lee 丢课记事件）----------
+   手机浏览器 localStorage 上限约 5MB，课堂照片一多就撞顶。撞顶后 setItem 抛异常，
+   老代码没接住 → 内容没存上却毫无提示、刷新即丢。现在：
+   ① 存失败 → 顶部常驻红条（点了直接去存档页）；② 用到 3MB/4MB 提前黄红提醒；③ 存档页显示真实占用。 */
+function stateKB(){ try{ return Math.round(JSON.stringify(S).length/1024); }catch(e){ return 0; } }
+function photoCount(){
+  let n=0;
+  (S.cnotes||[]).forEach(x=>{ n+=(x.imgs||[]).length; });
+  n+=(S.cards||[]).filter(c=>c.img).length;
+  n+=(S.ideas||[]).filter(x=>x.img).length;
+  return n;
+}
+function gotoView(v){
+  const b=[...document.querySelectorAll("nav button")].find(x=>x.dataset.v===v);
+  if(b) b.click();
+}
+function quotaBar(msg,red){
+  let el=document.getElementById("quotabar");
+  if(!el){
+    el=document.createElement("div"); el.id="quotabar";
+    el.onclick=function(){ hardRemoveBar(); gotoView("safe"); };
+    document.body.appendChild(el);
+  }
+  el.className=red?"qred":"qwarn";
+  el.innerHTML=msg;
+}
+function hardRemoveBar(){ const el=document.getElementById("quotabar"); if(el) el.remove(); }
+function quotaCheck(ok){
+  const kb=stateKB();
+  if(!ok){ quotaBar("⚠️ 存储满了，刚记的内容<b>没存进去</b>——点这里导出备份 + 一键瘦身",true); return false; }
+  if(kb>=4200){ quotaBar("存储 "+kb+"KB / 约 5MB，很满了：导出备份后点「一键瘦身」（点这里）",true); return false; }
+  if(kb>=3200){ quotaBar("存储 "+kb+"KB / 约 5MB，抽空导出备份更稳（点这里）",false); return false; }
+  hardRemoveBar(); return true;
+}
 function save(){
   clearTimeout(st);
   st=setTimeout(async()=>{
     if(!ready) return;
     const ok=await kSet(K_STATE,JSON.stringify(S));
-    if(!ok){ toast("存不下了。去「存档」页导出备份，再把几张照片收进回收站"); return; }
+    if(!ok){
+      quotaCheck(false);
+      toast("⚠️ 存储满了，内容没存上！点顶部红条处理");
+      return;
+    }
+    quotaCheck(true);
     const now=Date.now();
     if(now-lastSnap>5*60*1000){
       lastSnap=now;
@@ -2474,16 +2526,28 @@ function renderSafe(){
 
   try{ h+='<h2 class="sec">费用总计</h2><div class="card"><div class="num" style="font-size:22px;font-weight:700">¥'+eNum(expTotal())+'</div>'
     +'<p class="meta">共 '+((S.exp||[]).length)+' 笔 · 约 €'+eNum(expTotal()/(+S.rate||7.8))+'（汇率 1€='+(+S.rate||7.8)+'¥）· 明细看「费用」页</p></div>'; }catch(e){}
-  h+='<div class="card"><h3>当前数据</h3><p class="num">'+sizeOf(S)+'</p>'
+  const kb=stateKB(), lv=kb>=4200?2:(kb>=3200?1:0);
+  h+='<div class="card"><h3>存储体检</h3><p class="num">'+sizeOf(S)+'</p>'
+    +'<p class="meta">占用：<b>'+(kb/1024).toFixed(2)+' MB</b> / 上限约 5 MB　'
+    +'<span style="color:'+(lv===2?"var(--alert)":(lv===1?"#A8801A":"var(--ok,#2E7D5B)"))+'">'
+    +(lv===2?"很满了，先导出再瘦身":(lv===1?"偏高，建议抽空导出备份":"正常"))+'</span></p>'
+    +'<p class="meta">照片 '+photoCount()+' 张　·　课堂笔记 '+((S.cnotes||[]).length)+' 条　·　问师傅 '+((S.questions||[]).length)+' 行</p>'
+    +'<p class="meta">当前入口：<b>'+location.hostname+'</b>（换入口打开 = 换一份数据，认准这一个地址）</p>'
     +'<p class="meta">存储方式：'+(LS?"本机浏览器存储（localStorage）":(AS?"Claude 会话存储":"仅内存，关闭即失"))+'</p>'
     +'<p class="meta">代码版本：'+BUILD+'　·　存档点：'+SNAPS.length+' 个</p></div>';
+  if(lv) h+='<div class="banner '+(lv===2?"red":"")+'" style="'+(lv===1?"background:#FBF3DF;color:#7A5A10;border-color:#E4D7AE":"")+'">'
+    +'<b>'+(lv===2?"存储快满了（"+kb+"KB / 约 5000KB）":"存储用得有点多（"+kb+"KB）")+'</b><br>'
+    +'先点下面「导出备份文件」存一份到 iCloud / 微信收藏，再点「一键瘦身」压缩照片腾空间——瘦身只压照片，文字和结构不动。</div>';
 
   h+='<h2 class="sec">备份与恢复</h2>'
     +'<button class="ghost wide" id="doexport">导出备份文件（.json）</button>'
-    +'<button class="ghost wide" id="docopy">复制成文字（贴进备忘录也行）</button>'
+    +'<button class="ghost wide" id="docopy">复制成文字（贴进备忘录 / 微信收藏）</button>'
     +'<button class="ghost wide" id="doimport">从备份文件恢复</button>'
+    +'<textarea id="pastein" placeholder="或把之前「复制成文字」的备份粘到这里，再点下面的恢复" style="width:100%;box-sizing:border-box;min-height:70px;margin-top:10px;border:1px solid var(--line);border-radius:12px;padding:10px;font-size:12.5px;font-family:inherit;background:var(--card,#fff);color:inherit;-webkit-appearance:none"></textarea>'
+    +'<button class="ghost wide" id="dopaste">从粘贴的文字恢复</button>'
+    +'<button class="ghost wide" id="doslim">🧹 一键瘦身（压缩照片腾空间，文字和结构不动）</button>'
     +'<p style="font-size:12.5px;color:var(--mute);margin:2px 2px 0;line-height:1.55">'
-    +'恢复不会覆盖丢失 —— 导入前会自动先给当前数据留一个存档点，随时能回滚。</p>';
+    +'恢复不会覆盖丢失 —— 导入前会自动先给当前数据留一个存档点，随时能回滚。瘦身前建议先导出备份。</p>';
 
   h+='<h2 class="sec">存档点（最近 '+MAX_SNAPS+' 个，每 5 分钟一个）</h2><div class="card">';
   if(!SNAPS.length) h+='<p class="meta">还没有存档点，改点东西就会自动生成。</p>';
@@ -2677,22 +2741,59 @@ async function doExport(){
     renderSafe(); toast("已导出，存到 iCloud 或 Dropbox 里");
   }catch(e){ copyText(txt,"下载不支持，已复制成文字"); }
 }
+async function applyBackup(txt){
+  const o=JSON.parse(txt);
+  if(!o||!o.state) throw new Error("不是这个 App 的备份内容");
+  // 导入前先把当前数据存成存档点，绝不直接覆盖
+  SNAPS.push({t:Date.now(),n:"导入前 · "+sizeOf(S),d:stripImg(S)});
+  if(SNAPS.length>MAX_SNAPS) SNAPS=SNAPS.slice(-MAX_SNAPS);
+  await kSet(K_SNAPS,JSON.stringify(SNAPS));
+  S=Object.assign({done:{},pick:{},notes:{},cards:[],ideas:[]},o.state);
+  if(!Array.isArray(S.cards)) S.cards=[];
+  if(!Array.isArray(S.ideas)) S.ideas=[];
+  const ok=await kSet(K_STATE,JSON.stringify(S));
+  renderTrip(); renderStay(); renderExpo(); renderIdea(); renderNote(); renderSafe(); fillNotes(); updateHead(); mtRefresh();
+  quotaCheck(ok);
+  toast(ok?"已恢复。上一份数据存成了「导入前」存档点":"恢复进来了，但存储太满写不下——先点一键瘦身");
+}
 async function doImport(file){
-  try{
-    const txt=await file.text();
-    const o=JSON.parse(txt);
-    if(!o||!o.state) throw new Error("不是这个 App 的备份文件");
-    // 导入前先把当前数据存成存档点，绝不直接覆盖
-    SNAPS.push({t:Date.now(),n:"导入前 · "+sizeOf(S),d:stripImg(S)});
-    if(SNAPS.length>MAX_SNAPS) SNAPS=SNAPS.slice(-MAX_SNAPS);
-    await kSet(K_SNAPS,JSON.stringify(SNAPS));
-    S=Object.assign({done:{},pick:{},notes:{},cards:[],ideas:[]},o.state);
-    if(!Array.isArray(S.cards)) S.cards=[];
-    if(!Array.isArray(S.ideas)) S.ideas=[];
-    await kSet(K_STATE,JSON.stringify(S));
-    renderTrip(); renderStay(); renderExpo(); renderIdea(); renderNote(); renderSafe(); fillNotes(); updateHead(); mtRefresh();
-    toast("已恢复。上一份数据存成了「导入前」存档点");
-  }catch(e){ toast("恢复失败："+e.message); }
+  try{ await applyBackup(await file.text()); }
+  catch(e){ toast("恢复失败："+e.message); }
+}
+/* 一键瘦身（2026-09-14）：把已存的大图重新编码得更省空间。文字、结构、条数一律不动。
+   图片通常已经压过一次，这里只挑「尺寸明显偏大」的下手，避免反复重压导致糊掉。 */
+function recompressDataUrl(du,maxW,q){
+  return new Promise(res=>{
+    const im=new Image();
+    im.onload=()=>{
+      try{
+        if(im.width<=maxW){ res(du); return; }
+        const sc=Math.min(1,maxW/Math.max(im.width,im.height));
+        const cv=document.createElement("canvas");
+        cv.width=Math.max(1,Math.round(im.width*sc)); cv.height=Math.max(1,Math.round(im.height*sc));
+        cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height);
+        const out=cv.toDataURL("image/jpeg",q);
+        res(out&&out.length<du.length?out:du);
+      }catch(e){ res(du); }
+    };
+    im.onerror=()=>res(du);
+    im.src=du;
+  });
+}
+async function slimAll(){
+  const before=stateKB();
+  const jobs=[];
+  (S.cnotes||[]).forEach(x=>(x.imgs||[]).forEach((d,i)=>{ if(d&&d.length>35000) jobs.push({d,set:v=>{x.imgs[i]=v;}}); }));
+  (S.ideas||[]).forEach(x=>{ if(x.img&&x.img.length>35000) jobs.push({d:x.img,set:v=>{x.img=v;}}); });
+  if(!jobs.length){ toast("照片已经是最省模式了，没有可压的"); return; }
+  toast("瘦身中…共 "+jobs.length+" 张，先别关页面");
+  let n=0;
+  for(const j of jobs){ const out=await recompressDataUrl(j.d,380,0.48); if(out!==j.d){ j.set(out); n++; } }
+  const ok=await kSet(K_STATE,JSON.stringify(S));
+  const after=stateKB();
+  renderSafe(); renderNote(); renderIdea();
+  quotaCheck(ok);
+  toast("瘦身完成：省了 "+Math.max(0,before-after)+"KB（重压 "+n+" 张）");
 }
 async function restore(i){
   const s=SNAPS[i]; if(!s) return;
@@ -3486,6 +3587,14 @@ document.addEventListener("click", e=>{
   if(e.target.closest("#doexport")){ doExport(); return; }
   if(e.target.closest("#docopy")){ copyText(backupBlob(),"已复制，贴进备忘录或邮件发给自己"); return; }
   if(e.target.closest("#doimport")){ importer.click(); return; }
+  if(e.target.closest("#dopaste")){
+    const ta=document.getElementById("pastein");
+    const t=((ta&&ta.value)||"").trim();
+    if(!t){ toast("先把备份内容粘到上面的框里"); return; }
+    applyBackup(t).catch(err=>toast("恢复失败："+err.message));
+    return;
+  }
+  if(e.target.closest("#doslim")){ slimAll(); return; }
   const rs=e.target.closest("[data-restore]");
   if(rs){ restore(parseInt(rs.dataset.restore,10)); return; }
   const hc=e.target.closest("[data-hidecard]");
