@@ -512,10 +512,16 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-14.15";
+const BUILD="2026-09-14.16";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-14.16",c:[
+   "★ 换成大容量存储（IndexedDB）：容量从约 5MB 提到几十～几百 MB，照片再多也不怕。首次打开会自动把老数据搬进去（老数据先原样保留，不删）",
+   "★ 顶栏常驻容量显示：任何页面都能看到「大容量 x%」，超过 70% 变黄、超过 85% 变红",
+   "★ 容量告警系统：每次打开自动体检一次；写不进去立刻挂红条；存档页有完整「存储体检」（已用/可用/存储引擎/当前入口/上次备份时间）",
+   "★ 双保险：主力存 IndexedDB，另外在 localStorage 留一份「不含图片的精简版」（几 KB，永不写满）——万一大容量库被系统清掉，文字也能捞回来",
+   "🔧 修了一个隐患：以前的存档点没保存课程笔记、问师傅、费用，一按「回到这里」这些就没了；现在存档点完整保留（只去掉图片），回滚时图片按 id 自动找回"]},
  {v:"2026-09-14.15",c:[
    "🛠 重要修复（9/14 丢课记）：手机存储写满后，新记的内容会存不进去、而且没有任何提示，一刷新就退回旧内容。现在存不下会立刻在顶部挂红条，引导导出备份 + 一键瘦身",
    "★ 存档页新增「存储体检」：当前占用多少 MB（上限约 5MB）、照片几张、笔记几条、问师傅几行，还能看到你现在是从哪个入口打开的（换入口 = 换一份数据）",
@@ -1211,13 +1217,61 @@ const NOTES=[
 const K_STATE="leetrip.state.v1";
 const K_SNAPS="leetrip.snaps.v1";
 const K_META ="leetrip.meta.v1";
+const K_LITE ="leetrip.lite.v1";   /* 去图精简版兜底（localStorage，几 KB 不会满） */
 const MAX_SNAPS=40, MAX_CARDS=40, MAX_IDEAS=60;
 const ITAGS=["日式","韩式","中式","泰式","亚洲融合","其他菜系","包装","设备","门头/装修","菜单","其他"];
 
 const LS=(()=>{ try{ localStorage.setItem("__probe","1"); localStorage.removeItem("__probe"); return true; }catch(e){ return false; } })();
 const AS=(!LS && typeof window!=="undefined" && window.storage) ? window.storage : null;
 
+/* ---------- 大容量存储层（2026-09-14 Lee 要求"换大容量 + 到处都要有容量告警"）----------
+   localStorage 只有约 5MB，课堂照片一多就爆（9/14 已出过一次丢数据事故）。
+   现在主力换成 IndexedDB（配额几十 MB ～ 几百 MB，具体看系统给多少），localStorage 降级成
+   "轻量兜底"：只存一份不含图片的精简版（几 KB），永不写满；万一 IndexedDB 被系统清掉，还能把文字捞回来。 */
+const IDB_NAME="leetrip.db", IDB_STORE="kv", IDB_VER=1;
+let idb=null, idbState="init";        /* init | ok | fail */
+let storageInfo=null;                 /* {quota, usage} 由 navigator.storage.estimate() 填充 */
+function idbOpen(){
+  return new Promise(res=>{
+    try{
+      if(typeof indexedDB==="undefined"||!indexedDB){ idbState="fail"; return res(null); }
+      const rq=indexedDB.open(IDB_NAME,IDB_VER);
+      rq.onupgradeneeded=()=>{ const db=rq.result; if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE); };
+      rq.onsuccess=()=>{ idb=rq.result; idbState="ok"; res(idb); };
+      rq.onerror=()=>{ idbState="fail"; res(null); };
+      rq.onblocked=()=>{ idbState="fail"; res(null); };
+      setTimeout(()=>{ if(idbState==="init"){ idbState="fail"; res(null); } },4000);
+    }catch(e){ idbState="fail"; res(null); }
+  });
+}
+function idbGet(k){
+  return new Promise(res=>{
+    if(!idb) return res(null);
+    try{
+      const rq=idb.transaction(IDB_STORE,"readonly").objectStore(IDB_STORE).get(k);
+      rq.onsuccess=()=>res(rq.result==null?null:rq.result);
+      rq.onerror=()=>res(null);
+    }catch(e){ res(null); }
+  });
+}
+function idbSet(k,v){
+  return new Promise(res=>{
+    if(!idb) return res(false);
+    try{
+      const tx=idb.transaction(IDB_STORE,"readwrite");
+      tx.objectStore(IDB_STORE).put(v,k);
+      tx.oncomplete=()=>res(true);
+      tx.onerror=()=>res(false);
+      tx.onabort=()=>res(false);
+    }catch(e){ res(false); }
+  });
+}
+/* 轻量兜底：把全量 JSON 转成"去图版"再塞进 localStorage（几 KB，不会满） */
+function liteOf(jsonStr){
+  try{ return JSON.stringify(stripImg(JSON.parse(jsonStr))); }catch(e){ return null; }
+}
 async function kGet(k){
+  if(idbState==="ok"){ const v=await idbGet(k); if(v!=null&&v!=="") return v; }
   if(LS){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
   if(AS){ try{ const r=await AS.get(k); return r?r.value:null; }catch(e){ return null; } }
   return MEM[k]||null;
@@ -1225,39 +1279,125 @@ async function kGet(k){
 /* 2026-09-14 关键修复：setItem 在存储满时会抛异常，以前没接住 → 静默失败、内容没存上却毫无提示
    （Lee 9/14 丢了两天的课记，就是这个）。现在一律返回 false，交给 save() 报警。 */
 async function kSet(k,v){
+  if(idbState==="ok"){
+    const ok=await idbSet(k,v);
+    if(ok){
+      /* 顺手留一份去图精简版在 localStorage：那是"最后一道保险"，几 KB，永远不会写满 */
+      try{
+        if(k===K_STATE){ const lite=liteOf(v); if(lite) localStorage.setItem(K_LITE,lite); }
+        else if(k===K_META) localStorage.setItem(k,v);
+      }catch(e){}
+      return true;
+    }
+    /* IndexedDB 写失败（配额真到了 / 被系统限制）→ 再试 localStorage，失败就报 false 触发告警 */
+  }
   if(LS){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
   if(AS){ try{ return !!(await AS.set(k,v)); }catch(e){ return false; } }
   MEM[k]=v; return true;
 }
 const MEM={};
+/* 真实容量信息（2026-09-14）：navigator.storage.estimate() 给出浏览器实际分配的配额与已用量，
+   比"猜 5MB"准得多。拿不到就退回保守估算。 */
+let quotaInfo=null, persisted=false;
+async function refreshStorage(){
+  try{ if(navigator.storage&&navigator.storage.estimate) quotaInfo=await navigator.storage.estimate(); }catch(e){ quotaInfo=null; }
+  try{ if(navigator.storage&&navigator.storage.persist) await navigator.storage.persist(); }catch(e){}
+  try{ if(navigator.storage&&navigator.storage.persisted) persisted=await navigator.storage.persisted(); }catch(e){}
+}
+function fmtMB(n){ return n>=1048576? (n/1048576).toFixed(1)+" MB" : Math.round(n/1024)+" KB"; }
+/* 返回存储状态：0 正常 / 1 偏高 / 2 危险；以及给界面用的文案 */
+function storageStatus(){
+  const used=quotaInfo&&quotaInfo.usage||0, cap=quotaInfo&&quotaInfo.quota||0;
+  if(cap>0){
+    const pct=Math.round(used/cap*100);
+    const lv=pct>=85?2:(pct>=70?1:0);
+    return {lv,used,cap,pct,text:"已用 "+fmtMB(used)+" / 可用 "+fmtMB(cap)+"（"+pct+"%）"};
+  }
+  const kb=stateKB();   /* 拿不到配额：按"至少 5MB 可用"保守估计 */
+  const lv=kb>=4200?2:(kb>=3200?1:0);
+  return {lv,used:kb*1024,cap:5242880,pct:Math.round(kb/5120*100),text:"已用 "+kb+" KB / 至少 5 MB（浏览器没给准确配额）"};
+}
+/* 顶栏常驻容量徽标（2026-09-14 Lee 要求：任何页面都要能看见容量）：
+   显示「大容量 8%」这类，超过 70% 变黄、85% 变红，点存档页有详细体检 */
+function updateStoreBadge(){
+  const el=document.getElementById("storelab");
+  if(!el) return;
+  const st=storageStatus();
+  el.textContent=(idbState==="ok"?"大容量 ":"小容量 ")+st.pct+"%";
+  el.style.color=["","#A8801A","var(--alert)"][st.lv];
+  el.title=st.text+"　（详细体检看「存档」页）";
+}
 
 let S={done:{},pick:{},notes:{},cards:[],ideas:[]};
 let META={created:0,lastExport:0,restores:[]};
 let SNAPS=[];
 let ready=false, filter="all", hideDone=true, grid=false;   /* 默认折叠已完成：每次打开都只看没做完的 */
 
+/* 去图版（2026-09-14 修）：以前只留 done/pick/notes/cards/ideas，
+   cnotes（课程笔记）、questions（问师傅）、exp（费用）全都漏了 —— 存档点回滚会把它们抹掉。
+   现在全字段保留、只把图片清空，这类"轻量版"即可靠当兜底。 */
 function stripImg(st){
-  return {done:st.done,pick:st.pick,notes:st.notes,
-    cards:(st.cards||[]).map(c=>{const o=Object.assign({},c); o.img=""; return o;}),
-    ideas:(st.ideas||[]).map(c=>{const o=Object.assign({},c); o.img=""; return o;})};
+  st=st||{};
+  const o={done:st.done,pick:st.pick,notes:st.notes,
+    cards:(st.cards||[]).map(c=>{const x=Object.assign({},c); x.img=""; return x;}),
+    ideas:(st.ideas||[]).map(c=>{const x=Object.assign({},c); x.img=""; return x;}),
+    cnotes:(st.cnotes||[]).map(x=>{const y=Object.assign({},x); y.imgs=[]; return y;}),
+    questions:(st.questions||[]).map(q=>Object.assign({},q)),
+    exp:(st.exp||[]).map(e=>Object.assign({},e)),
+    rate:st.rate, meStayId:st.meStayId, expSeeded:st.expSeeded,
+    cnoteMig2:st.cnoteMig2, cnoteMig3:st.cnoteMig3, expMig11:st.expMig11, expMig12:st.expMig12, ideaTagMig:st.ideaTagMig};
+  return o;
 }
 function sizeOf(st){
+  st=st||{};
   return (Object.keys(st.done||{}).length)+"勾选 · "
     +(Object.values(st.notes||{}).filter(v=>v&&v.trim()).length)+"笔记 · "
+    +((st.cnotes||[]).length)+"课记 · "
+    +((st.questions||[]).length)+"问师傅 · "
     +((st.cards||[]).length)+"名片 · "
     +((st.ideas||[]).length)+"灵感";
 }
 
+let pendingNotice="";
 async function load(){
-  try{
-    const raw=await kGet(K_STATE);
-    if(raw) S=Object.assign({done:{},pick:{},notes:{},cards:[],ideas:[]},JSON.parse(raw));
-    if(!Array.isArray(S.cards)) S.cards=[];
-    if(!Array.isArray(S.ideas)) S.ideas=[];
-  }catch(e){}
+  await idbOpen();                      /* 先开大容量存储；不可用就自动降级回 localStorage */
+  let raw=null, from="idb";
+  if(idbState==="ok") raw=await idbGet(K_STATE);
+  if(!raw){                             /* 大容量库里还没有 → 看看有没有老数据要搬 */
+    try{ raw=localStorage.getItem(K_STATE); }catch(e){}
+    if(raw) from="migrate";
+  }
+  if(!raw){                             /* 全量都没有 → 用去图兜底（最坏情况：图没了、文字还在） */
+    try{ raw=localStorage.getItem(K_LITE); }catch(e){}
+    if(raw) from="lite";
+  }
+  if(raw){
+    try{
+      S=Object.assign({done:{},pick:{},notes:{},cards:[],ideas:[]},JSON.parse(raw));
+      if(!Array.isArray(S.cards)) S.cards=[];
+      if(!Array.isArray(S.ideas)) S.ideas=[];
+      if(!Array.isArray(S.cnotes)) S.cnotes=[];
+      if(!Array.isArray(S.questions)) S.questions=[];
+    }catch(e){ from="bad"; }
+  }
   try{ const r=await kGet(K_SNAPS); if(r) SNAPS=JSON.parse(r)||[]; }catch(e){ SNAPS=[]; }
   try{ const m=await kGet(K_META); if(m) META=Object.assign(META,JSON.parse(m)); }catch(e){}
-  if(!META.created){ META.created=Date.now(); await kSet(K_META,JSON.stringify(META)); }
+  if(!META.created){ META.created=Date.now(); }
+  /* 落地到大容量存储：老数据搬家 + 顺手把 SNAPS/META 也写进去（幂等） */
+  if(idbState==="ok"){
+    if(from==="migrate"){
+      const ok=await idbSet(K_STATE,JSON.stringify(S));
+      if(ok) pendingNotice="✅ 数据已搬进大容量存储（"+Math.round(raw.length/1024)+"KB）——以后不吃 5MB 上限了";
+      else pendingNotice="⚠️ 大容量存储写入失败，暂时仍在本地存储上跑，先别加太多照片";
+    }
+    if(SNAPS.length) await idbSet(K_SNAPS,JSON.stringify(SNAPS));
+    await idbSet(K_META,JSON.stringify(META));
+  }else{
+    await kSet(K_META,JSON.stringify(META));
+  }
+  if(from==="lite") pendingNotice="⚠️ 只找回了文字版（图片丢了）：去「存档」页用备份恢复，或从你平时那个入口打开看看";
+  if(from==="bad") pendingNotice="⚠️ 存储内容读不出来：已用空数据启动，请立刻到「存档」页用备份恢复";
+  refreshStorage().then(()=>{ try{ updateStoreBadge(); if(document.getElementById("v-safe").classList.contains("on")) renderSafe(); }catch(e){} });
   ready=true;
 }
 
@@ -1267,12 +1407,11 @@ let st=null, lastSnap=0;
    老代码没接住 → 内容没存上却毫无提示、刷新即丢。现在：
    ① 存失败 → 顶部常驻红条（点了直接去存档页）；② 用到 3MB/4MB 提前黄红提醒；③ 存档页显示真实占用。 */
 function stateKB(){ try{ return Math.round(JSON.stringify(S).length/1024); }catch(e){ return 0; } }
+function nCnoteImgs(){ return (S.cnotes||[]).reduce((n,x)=>n+((x.imgs||[]).length),0); }
 function photoCount(){
-  let n=0;
-  (S.cnotes||[]).forEach(x=>{ n+=(x.imgs||[]).length; });
-  n+=(S.cards||[]).filter(c=>c.img).length;
-  n+=(S.ideas||[]).filter(x=>x.img).length;
-  return n;
+  return nCnoteImgs()
+    +(S.cards||[]).filter(c=>c.img).length
+    +(S.ideas||[]).filter(x=>x.img).length;
 }
 function gotoView(v){
   const b=[...document.querySelectorAll("nav button")].find(x=>x.dataset.v===v);
@@ -1290,10 +1429,10 @@ function quotaBar(msg,red){
 }
 function hardRemoveBar(){ const el=document.getElementById("quotabar"); if(el) el.remove(); }
 function quotaCheck(ok){
-  const kb=stateKB();
-  if(!ok){ quotaBar("⚠️ 存储满了，刚记的内容<b>没存进去</b>——点这里导出备份 + 一键瘦身",true); return false; }
-  if(kb>=4200){ quotaBar("存储 "+kb+"KB / 约 5MB，很满了：导出备份后点「一键瘦身」（点这里）",true); return false; }
-  if(kb>=3200){ quotaBar("存储 "+kb+"KB / 约 5MB，抽空导出备份更稳（点这里）",false); return false; }
+  const st=storageStatus();
+  if(!ok){ quotaBar("⚠️ 存储写不进去了，刚记的内容<b>没存上</b>——点这里导出备份 + 一键瘦身",true); return false; }
+  if(st.lv>=2){ quotaBar("存储告急："+st.text+"，导出备份后点「一键瘦身」（点这里）",true); return false; }
+  if(st.lv>=1){ quotaBar("存储偏多："+st.text+"，抽空导出备份更稳（点这里）",false); return false; }
   hardRemoveBar(); return true;
 }
 function save(){
@@ -2526,17 +2665,21 @@ function renderSafe(){
 
   try{ h+='<h2 class="sec">费用总计</h2><div class="card"><div class="num" style="font-size:22px;font-weight:700">¥'+eNum(expTotal())+'</div>'
     +'<p class="meta">共 '+((S.exp||[]).length)+' 笔 · 约 €'+eNum(expTotal()/(+S.rate||7.8))+'（汇率 1€='+(+S.rate||7.8)+'¥）· 明细看「费用」页</p></div>'; }catch(e){}
-  const kb=stateKB(), lv=kb>=4200?2:(kb>=3200?1:0);
+  const ss=storageStatus();
+  const ssColor=["var(--ok,#2E7D5B)","#A8801A","var(--alert)"][ss.lv];
+  const ssTxt=["正常","偏高，建议抽空导出备份","告急，先导出再瘦身"][ss.lv];
+  const engine=(idbState==="ok")
+    ? ("大容量存储（IndexedDB）"+(persisted?" · 已被系统锁定、不会被自动清理":""))
+    : (LS?"本机浏览器存储（localStorage，小，约 5MB）":(AS?"Claude 会话存储":"仅内存，关闭即失"));
   h+='<div class="card"><h3>存储体检</h3><p class="num">'+sizeOf(S)+'</p>'
-    +'<p class="meta">占用：<b>'+(kb/1024).toFixed(2)+' MB</b> / 上限约 5 MB　'
-    +'<span style="color:'+(lv===2?"var(--alert)":(lv===1?"#A8801A":"var(--ok,#2E7D5B)"))+'">'
-    +(lv===2?"很满了，先导出再瘦身":(lv===1?"偏高，建议抽空导出备份":"正常"))+'</span></p>'
-    +'<p class="meta">照片 '+photoCount()+' 张　·　课堂笔记 '+((S.cnotes||[]).length)+' 条　·　问师傅 '+((S.questions||[]).length)+' 行</p>'
+    +'<p class="meta">容量：<b>'+ss.text+'</b>　<span style="color:'+ssColor+'">'+ssTxt+'</span></p>'
+    +'<p class="meta">照片 '+photoCount()+' 张（笔记 '+nCnoteImgs()+' · 名片 '+((S.cards||[]).filter(c=>c.img).length)+' · 灵感 '+((S.ideas||[]).filter(x=>x.img).length)+'）</p>'
+    +'<p class="meta">存储引擎：'+engine+'</p>'
     +'<p class="meta">当前入口：<b>'+location.hostname+'</b>（换入口打开 = 换一份数据，认准这一个地址）</p>'
-    +'<p class="meta">存储方式：'+(LS?"本机浏览器存储（localStorage）":(AS?"Claude 会话存储":"仅内存，关闭即失"))+'</p>'
-    +'<p class="meta">代码版本：'+BUILD+'　·　存档点：'+SNAPS.length+' 个</p></div>';
-  if(lv) h+='<div class="banner '+(lv===2?"red":"")+'" style="'+(lv===1?"background:#FBF3DF;color:#7A5A10;border-color:#E4D7AE":"")+'">'
-    +'<b>'+(lv===2?"存储快满了（"+kb+"KB / 约 5000KB）":"存储用得有点多（"+kb+"KB）")+'</b><br>'
+    +'<p class="meta">代码版本：'+BUILD+'　·　存档点：'+SNAPS.length+' 个　·　数据 '+fmtMB(stateKB()*1024)+'</p>'
+    +'<p class="meta">上次备份：'+(META.lastExport?fmt(META.lastExport):"从未导出过 ← 建议现在就导一份")+'</p></div>';
+  if(ss.lv) h+='<div class="banner '+(ss.lv===2?"red":"")+'" style="'+(ss.lv===1?"background:#FBF3DF;color:#7A5A10;border-color:#E4D7AE":"")+'">'
+    +'<b>'+(ss.lv===2?"存储告急":"存储用得偏多")+'：'+ss.text+'</b><br>'
     +'先点下面「导出备份文件」存一份到 iCloud / 微信收藏，再点「一键瘦身」压缩照片腾空间——瘦身只压照片，文字和结构不动。</div>';
 
   h+='<h2 class="sec">备份与恢复</h2>'
@@ -2641,7 +2784,7 @@ function updateHead(){
   const done=ALL.filter(i=>S.done[i]).length;
   document.getElementById("bar").style.width=Math.round(done/ALL.length*100)+"%";
   document.getElementById("prog").textContent=done+" / "+ALL.length+" 项已完成";
-  document.getElementById("storelab").textContent=LS?"":(AS?"预览模式":"未持久化");
+  updateStoreBadge();   /* 顶栏常驻容量（大容量 8% / 小容量 76%，超阈值变黄变红） */
   const today=new Date(), dep=new Date(2026,8,8), end=new Date(2026,8,24), day=864e5;
   const dd=Math.ceil((dep-today)/day);
   const cd=document.getElementById("cd"), lab=document.getElementById("cdlab"), ph=document.getElementById("phase");
@@ -2800,14 +2943,21 @@ async function restore(i){
   SNAPS.push({t:Date.now(),n:"回滚前 · "+sizeOf(S),d:stripImg(S)});
   if(SNAPS.length>MAX_SNAPS) SNAPS=SNAPS.slice(-MAX_SNAPS);
   await kSet(K_SNAPS,JSON.stringify(SNAPS));
-  const imgs={}; S.cards.forEach(c=>{ if(c.img) imgs[c.id]=c.img; });
-  S.ideas.forEach(x=>{ if(x.img) imgs[x.id]=x.img; });
+  /* 存档点存的是"去图版"，这里按 id 把图从当前数据里找回来（课程笔记、名片、灵感都找） */
+  const imgs={};
+  (S.cards||[]).forEach(c=>{ if(c.img) imgs[c.id]=c.img; });
+  (S.ideas||[]).forEach(x=>{ if(x.img) imgs[x.id]=x.img; });
+  const cimgs={};
+  (S.cnotes||[]).forEach(x=>{ if((x.imgs||[]).length) cimgs[x.id]=x.imgs; });
   S=Object.assign({done:{},pick:{},notes:{},cards:[],ideas:[]},JSON.parse(JSON.stringify(s.d)));
-  S.cards.forEach(c=>{ if(imgs[c.id]) c.img=imgs[c.id]; });
-  S.ideas.forEach(x=>{ if(imgs[x.id]) x.img=imgs[x.id]; });
-  await kSet(K_STATE,JSON.stringify(S));
-  renderTrip(); renderStay(); renderExpo(); renderNote(); renderSafe(); fillNotes(); updateHead();
-  toast("已回到 "+fmt(s.t)+"（当前状态也存了一份）");
+  ["cards","ideas","cnotes","questions","exp"].forEach(k=>{ if(!Array.isArray(S[k])) S[k]=[]; });
+  (S.cards||[]).forEach(c=>{ if(imgs[c.id]) c.img=imgs[c.id]; });
+  (S.ideas||[]).forEach(x=>{ if(imgs[x.id]) x.img=imgs[x.id]; });
+  (S.cnotes||[]).forEach(x=>{ if(cimgs[x.id]&&!(x.imgs||[]).length) x.imgs=cimgs[x.id]; });
+  const ok=await kSet(K_STATE,JSON.stringify(S));
+  renderTrip(); renderStay(); renderExpo(); renderIdea(); renderNote(); renderSafe(); fillNotes(); updateHead();
+  quotaCheck(ok);
+  toast(ok?("已回到 "+fmt(s.t)+"（图片按 id 找回，当前状态也存了一份）"):"回滚了，但存储写不下——先瘦身再试一次");
 }
 
 const ipicker=document.getElementById("ipicker");
@@ -3798,6 +3948,9 @@ setTimeout(function(){
   await load();
   renderTrip(); renderStay(); renderExpo(); renderIdea(); renderNote(); renderSafe();
   fillNotes(); updateHead(); mtRefresh();
+  updateStoreBadge();
+  if(pendingNotice) setTimeout(()=>toast(pendingNotice),900);   /* 迁移/降级结果告诉用户 */
+  quotaCheck(true);                                             /* 启动先体检一次，用量高就挂提示条 */
 })();
 </script>
 </body>
