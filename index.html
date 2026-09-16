@@ -183,6 +183,9 @@
   .draghd{cursor:grab;touch-action:none;font-size:11.5px;color:var(--ink2);padding:3px 9px;border:1px solid var(--line);border-radius:11px;background:var(--paper);user-select:none;-webkit-user-select:none}
   .draghd:active{cursor:grabbing;background:var(--indigo-soft)}
   .idea.cmerge.dragging{opacity:.92;box-shadow:0 10px 26px rgba(20,32,29,.24);transition:none}
+  /* 组内照片行拖动中的样子（2026-09-16）：抬起来一点，看得清正在挪哪一行 */
+  .iitem.dragging{opacity:.94;position:relative;z-index:6;transition:none;
+    box-shadow:0 10px 26px rgba(20,32,29,.24);border-color:var(--indigo);background:var(--paper)}
   /* 问师傅清单 */
   .qgrp{border-top:1px dashed var(--line);padding:9px 0 2px;margin-top:4px}
   .qgrp:first-of-type{border-top:none;padding-top:0;margin-top:0}
@@ -512,10 +515,13 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-14.16";
+const BUILD="2026-09-16.17";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-16.17",c:[
+   "★ 拖动能一次挪好几格了：以前组里的照片上下拖只能挪一格、还得重新拖一段才动第二格；现在按住「≡」可以一口气拖过好几行，拖到屏幕上下边缘还会自动滚动，长列表也好拖。合并挑选页的整卡拖动同样升级",
+   "🔧 拖动时被拖的那一行会抬起来（加阴影、变色），看得清正在挪哪一行"]},
  {v:"2026-09-14.16",c:[
    "★ 换成大容量存储（IndexedDB）：容量从约 5MB 提到几十～几百 MB，照片再多也不怕。首次打开会自动把老数据搬进去（老数据先原样保留，不删）",
    "★ 顶栏常驻容量显示：任何页面都能看到「大容量 x%」，超过 70% 变黄、超过 85% 变红",
@@ -3461,93 +3467,95 @@ function renderExp(){
   });
 }
 
+/* ---------- 拖动排序核心（2026-09-16 重写）----------
+   Lee 反馈"只能拖动一格"。旧实现每换一格就把基准归零、还写成 else if 只测单侧，
+   想挪第二格必须重新走完一整格的距离，所以体感只能挪一格。现在：
+   ① 按"被拖行的视觉中心落在哪两行之间"直接算目标位置 → 一次可跨好几格；
+   ② 插入 DOM 后修正基准（startY += 位移量），视觉上不跳；
+   ③ setPointerCapture 抓稳指针（触摸时不被滚动手势打断）；④ 靠近屏幕上下边缘自动滚动。 */
+function dropBeforeIdx(centers,myC){
+  for(let i=0;i<centers.length;i++){ if(myC<centers[i]) return i; }
+  return centers.length;
+}
+function rowDragCore(el,itemSel,e,onDone){
+  const list=el.parentNode;
+  let startY=e.clientY, curY=e.clientY;
+  el.classList.add("dragging");
+  try{ el.setPointerCapture(e.pointerId); }catch(_){}
+  const paint=()=>{ el.style.transform="translateY("+(curY-startY)+"px)"; };
+  const place=()=>{
+    paint();
+    const items=[...list.querySelectorAll(itemSel)].filter(x=>x!==el);
+    if(!items.length) return;
+    const centers=items.map(x=>{ const r=x.getBoundingClientRect(); return r.top+r.height/2; });
+    const me=el.getBoundingClientRect();
+    const want=items[dropBeforeIdx(centers,me.top+me.height/2)]||null;
+    if(want!==el.nextElementSibling){
+      const before=el.getBoundingClientRect().top;
+      const anchor=want||items[items.length-1].nextSibling||null;
+      list.insertBefore(el,anchor);
+      startY+=(el.getBoundingClientRect().top-before);   /* 关键：修正基准，视觉不跳 */
+      paint();
+    }
+  };
+  const move=e2=>{
+    curY=e2.clientY;
+    place();
+    const vh=window.innerHeight||0;                      /* 拖到屏幕边缘自动滚，方便一次挪很远 */
+    if(vh){
+      if(curY<90){ try{ window.scrollBy(0,-9); }catch(_){} }
+      else if(curY>vh-150){ try{ window.scrollBy(0,9); }catch(_){} }
+    }
+  };
+  const up=()=>{
+    document.removeEventListener("pointermove",move);
+    document.removeEventListener("pointerup",up);
+    document.removeEventListener("pointercancel",up);
+    el.style.transform=""; el.classList.remove("dragging");
+    try{ el.releasePointerCapture(e.pointerId); }catch(_){}
+    if(onDone) onDone();
+  };
+  document.addEventListener("pointermove",move,{passive:false});
+  document.addEventListener("pointerup",up);
+  document.addEventListener("pointercancel",up);
+}
+
 /* 合并模式拖动排序（2026-09-12 Lee）：按住「≡ 拖动」手柄上下拖，整卡（照片+备注）跟着走，
    松手记住顺序；合并时按这个顺序排，第一位的就是组的主条目 */
-let mdEl=null, mdY0=0;
 document.addEventListener("pointerdown",e=>{
   const h=e.target.closest("[data-draghd]");
   if(!h||!S.cMergeMode) return;
-  mdEl=h.closest("[data-mergep]");
-  if(!mdEl) return;
+  const el=h.closest("[data-mergep]");
+  if(!el) return;
   e.preventDefault();
-  mdEl.classList.add("dragging");
-  mdY0=e.clientY;
-  const move=ev=>{
-    if(!mdEl) return;
-    const dy=ev.clientY-mdY0;
-    mdEl.style.transform="translateY("+dy+"px)";
-    const nxt=mdEl.nextElementSibling, prv=mdEl.previousElementSibling;
-    if(nxt&&nxt.classList&&nxt.classList.contains("cmerge")){
-      const r=nxt.getBoundingClientRect();
-      if(ev.clientY>r.top+r.height/2){ mdEl.parentNode.insertBefore(nxt,mdEl); mdY0=ev.clientY; mdEl.style.transform=""; }
-    }else if(prv&&prv.classList&&prv.classList.contains("cmerge")){
-      const r=prv.getBoundingClientRect();
-      if(ev.clientY<r.top+r.height/2){ mdEl.parentNode.insertBefore(mdEl,prv); mdY0=ev.clientY; mdEl.style.transform=""; }
-    }
-  };
-  const up=()=>{
-    document.removeEventListener("pointermove",move);
-    document.removeEventListener("pointerup",up);
-    document.removeEventListener("pointercancel",up);
-    if(mdEl){
-      mdEl.style.transform=""; mdEl.classList.remove("dragging");
-      S.cMergeOrder=[...mdEl.parentNode.querySelectorAll("[data-mergep]")].map(c=>c.dataset.mergep);
-      save();
-    }
-    mdEl=null;
-  };
-  document.addEventListener("pointermove",move,{passive:false});
-  document.addEventListener("pointerup",up);
-  document.addEventListener("pointercancel",up);
+  rowDragCore(el,"[data-mergep]",e,()=>{
+    S.cMergeOrder=[...el.parentNode.querySelectorAll("[data-mergep]")].map(c=>c.dataset.mergep);
+    save(); toast("顺序记住了，合并时按这个来");
+  });
 });
 
 /* 组内照片行拖动（2026-09-12 Lee：已合并的组里，每张"图+图注"也能上下拖换位置）：
-   按住行首「≡」上下拖，松手按新顺序重排 imgs/caps（图和图注永远一对） */
-let miEl=null, miY0=0;
+   按住行首「≡」上下拖，松手按新顺序重排 imgs/caps（图和图注永远一对）。2026-09-16 换成
+   rowDragCore → 支持一次跨多格。 */
 document.addEventListener("pointerdown",e=>{
   const h=e.target.closest("[data-dragci]");
   if(!h) return;
-  miEl=h.closest(".iitem");
-  if(!miEl) return;
+  const el=h.closest(".iitem");
+  if(!el) return;
   e.preventDefault();
-  miEl.classList.add("dragging");
-  miY0=e.clientY;
-  const move=ev=>{
-    if(!miEl) return;
-    const dy=ev.clientY-miY0;
-    miEl.style.transform="translateY("+dy+"px)";
-    const nxt=miEl.nextElementSibling, prv=miEl.previousElementSibling;
-    if(nxt&&nxt.classList&&nxt.classList.contains("iitem")){
-      const r=nxt.getBoundingClientRect();
-      if(ev.clientY>r.top+r.height/2){ miEl.parentNode.insertBefore(nxt,miEl); miY0=ev.clientY; miEl.style.transform=""; }
-    }else if(prv&&prv.classList&&prv.classList.contains("iitem")){
-      const r=prv.getBoundingClientRect();
-      if(ev.clientY<r.top+r.height/2){ miEl.parentNode.insertBefore(miEl,prv); miY0=ev.clientY; miEl.style.transform=""; }
-    }
-  };
-  const up=()=>{
-    document.removeEventListener("pointermove",move);
-    document.removeEventListener("pointerup",up);
-    document.removeEventListener("pointercancel",up);
-    if(miEl){
-      miEl.style.transform=""; miEl.classList.remove("dragging");
-      const wrap=miEl.closest("[data-clist]");
-      if(wrap){
-        const cid=wrap.dataset.clist;
-        const x=(S.cnotes||[]).find(i=>i.id===cid);
-        if(x){
-          const order=[...wrap.querySelectorAll(".iitem")].map(it=>+it.dataset.ci);
-          x.imgs=order.map(k=>x.imgs[k]);
-          x.caps=order.map(k=>((x.caps||[])[k])||"");
-          save(); renderNote(); toast("顺序调好了，图和说明一起挪");
-        }
-      }
-    }
-    miEl=null;
-  };
-  document.addEventListener("pointermove",move,{passive:false});
-  document.addEventListener("pointerup",up);
-  document.addEventListener("pointercancel",up);
+  rowDragCore(el,".iitem",e,()=>{
+    const wrap=el.closest("[data-clist]");
+    if(!wrap) return;
+    const cid=wrap.dataset.clist;
+    const x=(S.cnotes||[]).find(i=>i.id===cid);
+    if(!x) return;
+    const order=[...wrap.querySelectorAll(".iitem")].map(it=>+it.dataset.ci);
+    x.imgs=order.map(k=>x.imgs[k]);
+    x.caps=order.map(k=>((x.caps||[])[k])||"");
+    save(); renderNote();
+    const moved=order.length;
+    toast("顺序调好了 —— "+moved+" 张图和说明一起挪过去了");
+  });
 });
 
 /* ---------- 事件 ---------- */
