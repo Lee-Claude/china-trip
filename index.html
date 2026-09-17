@@ -515,10 +515,13 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-16.17";
+const BUILD="2026-09-17.18";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-17.18",c:[
+   "★ 展会页作战清单也能收起已勾项了：跟行程页「隐藏已完成」一个用法——勾掉的自动收起，进度条和各组计数照常显示；点「显示已勾 N」或底部「✓ 已勾 N 项」随时展开，展开后想取消打勾也行",
+   "🔧 顺手修了一个老毛病：行程页底部的「✓ 已完成 N 项」折叠条之前点了没反应（只有顶上那个按钮管用），现在点它能正常折叠 / 展开"]},
  {v:"2026-09-16.17",c:[
    "★ 拖动能一次挪好几格了：以前组里的照片上下拖只能挪一格、还得重新拖一段才动第二格；现在按住「≡」可以一口气拖过好几行，拖到屏幕上下边缘还会自动滚动，长列表也好拖。合并挑选页的整卡拖动同样升级",
    "🔧 拖动时被拖的那一行会抬起来（加阴影、变色），看得清正在挪哪一行"]},
@@ -1768,9 +1771,16 @@ const EXPO_KEY="wb-expo-checklist-v1";
 let expoDone={};
 try{ expoDone=JSON.parse(localStorage.getItem(EXPO_KEY)||"{}")||{}; }catch(e){ expoDone={}; }
 function expoSave(){ try{ localStorage.setItem(EXPO_KEY,JSON.stringify(expoDone)); }catch(e){} }
+/* 已勾项收起（2026-09-17 Lee 要求，跟行程页「隐藏已完成」一致）：默认收起，记住手动切换 */
+const EXPO_HIDE_KEY="wb-expo-hide-v1";
+let expoHide=true;
+try{ expoHide=(localStorage.getItem(EXPO_HIDE_KEY)||"1")!=="0"; }catch(e){}
+function expoHideSave(){ try{ localStorage.setItem(EXPO_HIDE_KEY,expoHide?"1":"0"); }catch(e){} }
+function expoDoneCount(){ let n=0; EXPO_GROUPS.forEach(g=>g.items.forEach((it,i)=>{ if(expoIsOn(g,it,i)) n++; })); return n; }
 function expoIsOn(g,it,i){ const k=g.id+"-"+i; return expoDone[k]===undefined ? !!it.def : !!expoDone[k]; }
 function expoToggle(cb){
   expoDone[cb.id]=cb.checked; expoSave();
+  if(expoHide){ expoRender(); return; }   /* 收起模式：勾完当场折进去（跟行程页一样），不用手动刷新 */
   cb.closest(".xcheck").classList.toggle("on",cb.checked);
   let total=0,ok=0;
   EXPO_GROUPS.forEach(g=>g.items.forEach((it,i)=>{ total++; if(expoIsOn(g,it,i)) ok++; }));
@@ -1792,14 +1802,26 @@ function expoRender(){
   const box=document.getElementById("expoChecklist"); if(!box) return;
   let html="";
   EXPO_GROUPS.forEach(g=>{
+    const vis=[];
+    g.items.forEach((it,i)=>{ if(!(expoHide&&expoIsOn(g,it,i))) vis.push([it,i]); });
     html+='<div class="xgrp"><h4>'+esc(g.label)+' <span class="xcnt" id="xc-'+g.id+'"></span></h4><div class="xitems">';
-    g.items.forEach((it,i)=>{
-      const id=g.id+"-"+i, on=expoIsOn(g,it,i);
-      html+='<label class="xcheck'+(on?" on":"")+'"><input type="checkbox" id="'+id+'"'+(on?" checked":"")
-        +' onchange="expoToggle(this)"><span>'+esc(it.t)+(it.s?'<span class="sub">'+esc(it.s)+'</span>':"")+'</span></label>';
-    });
+    if(!vis.length){
+      html+='<div style="font-size:12.5px;color:var(--mute);padding:2px 0 8px">✓ 本组 '+g.items.length+' 项都已勾完，已收起</div>';
+    }else{
+      vis.forEach(a=>{
+        const it=a[0], i=a[1], id=g.id+"-"+i, on=expoIsOn(g,it,i);
+        html+='<label class="xcheck'+(on?" on":"")+'"><input type="checkbox" id="'+id+'"'+(on?" checked":"")
+          +' onchange="expoToggle(this)"><span>'+esc(it.t)+(it.s?'<span class="sub">'+esc(it.s)+'</span>':"")+'</span></label>';
+      });
+    }
     html+='</div></div>';
   });
+  const dn=expoDoneCount();
+  if(dn>0){
+    html+=expoHide
+      ?'<button class="foldbar" data-xhide="1" style="margin-top:12px"><b>✓ 已勾 '+dn+' 项</b>　已收起　·　点开显示 / 取消打勾</button>'
+      :'<button class="foldbar" data-xhide="1" style="margin-top:12px"><b>✓ 已勾 '+dn+' 项</b>　·　点这里重新收起</button>';
+  }
   box.innerHTML=html;
   EXPO_GROUPS.forEach(g=>{
     let t=g.items.length,o=0; g.items.forEach((it,i)=>{ if(expoIsOn(g,it,i)) o++; });
@@ -1809,6 +1831,8 @@ function expoRender(){
   EXPO_GROUPS.forEach(g=>g.items.forEach((it,i)=>{ total++; if(expoIsOn(g,it,i)) ok++; }));
   const bar=document.getElementById("expoBar"); if(bar) bar.style.width=(total?Math.round(ok/total*100):0)+"%";
   const lab=document.getElementById("expoCnt"); if(lab) lab.textContent=ok+" / "+total+" 项已勾";
+  const xchip=document.querySelector("#v-expo .chip[data-xhide]");
+  if(xchip){ xchip.classList.toggle("on",!expoHide); xchip.textContent=expoHide?("显示已勾 "+dn):"隐藏已勾"; }
 }
 
 function renderExpo(){
@@ -1819,8 +1843,10 @@ function renderExpo(){
     +'<button class="ghost" data-ab="1">📍 地址簿</button></div>';
 
   h+='<h2 class="sec">📋 展会作战清单（勾完自动存，进度跟着你）</h2><div class="card">'
-    +'<div class="xbar"><i id="expoBar"></i></div>'
-    +'<p class="meta" id="expoCnt" style="margin:0 0 4px"></p>'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+    +'<div class="xbar" style="flex:1;min-width:130px;margin:0"><i id="expoBar"></i></div>'
+    +'<button class="chip'+(expoHide?"":" on")+'" data-xhide="1">'+(expoHide?("显示已勾 "+expoDoneCount()):"隐藏已勾")+'</button></div>'
+    +'<p class="meta" id="expoCnt" style="margin:8px 0 4px"></p>'
     +'<div id="expoChecklist"></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
     +'<button class="ghost" id="expoExp" style="flex:1;min-width:96px">导出清单</button>'
@@ -3732,8 +3758,10 @@ document.addEventListener("click", e=>{
   }
   const chip=e.target.closest(".chip[data-f]");
   if(chip){ filter=chip.dataset.f; renderTrip(); window.scrollTo(0,0); return; }
-  const hd=e.target.closest(".chip[data-hide]");
+  const hd=e.target.closest("[data-hide]");
   if(hd){ hideDone=!hideDone; renderTrip(); return; }
+  const xh=e.target.closest("[data-xhide]");
+  if(xh){ expoHide=!expoHide; expoHideSave(); expoRender(); return; }
   const gd=e.target.closest(".chip[data-grid]");
   if(gd){ grid=!grid; renderTrip(); return; }
   if(e.target.closest("#scan")){ picker.click(); return; }
