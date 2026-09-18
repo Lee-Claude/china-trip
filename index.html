@@ -515,10 +515,13 @@
 <div class="lightbox" id="lightbox" data-page-node-id="ideaLight001"><img alt="灵感照片"></div>
 
 <script>
-const BUILD="2026-09-18.19";
+const BUILD="2026-09-18.20";
 
 /* 更新记录：我每改一次内容就在这里加一条，你在「存档」页能看到改了什么 */
 const CHANGELOG=[
+ {v:"2026-09-18.20",c:[
+   "★ 展会页新增「🤖 AI 观展 · 按馆找货清单」：你的开场白原话置顶（一键复制），另备一份加强版（冷链出口/预制菜/设备/物流四类一次说清）；按官方助手的分组（E2/E3/W3/W4/W2）列好每馆的「AI 找展位输入」+ 现场三问，直接照单走馆",
+   "🔧 官方 AI 观展助手实测：网址通、免登录，但 AI 对话服务显示「展会服务暂未开放」——那是主办方的开关没开，微信找组委会廖先生（13487318646）开一下就行；找展位/平面图功能不受影响"]},
  {v:"2026-09-18.19",c:[
    "🛠 重要修复：底部导航写的是 6 列、实际有 7 个标签，「存档」被挤到第二行把导航撑高一倍，右下角「↻ 刷新」按钮正好整个压住「费用」标签（点哪儿都是刷新）。已改成 7 列单行，费用 / 存档都能正常点了",
    "★ 9/20 回程票出票，座位号已写进行程：G695 长沙南 18:54 → 广州南 21:16 · 15车13B号；C7727 广州南 21:42 → 容桂 21:56 · 04车07D号（全程 ¥378，广州南换乘 26 分钟）",
@@ -1781,6 +1784,22 @@ let expoHide=true;
 try{ expoHide=(localStorage.getItem(EXPO_HIDE_KEY)||"1")!=="0"; }catch(e){}
 function expoHideSave(){ try{ localStorage.setItem(EXPO_HIDE_KEY,expoHide?"1":"0"); }catch(e){} }
 function expoDoneCount(){ let n=0; EXPO_GROUPS.forEach(g=>g.items.forEach((it,i)=>{ if(expoIsOn(g,it,i)) n++; })); return n; }
+/* AI 观展 concierge（2026-09-18 Lee）：开场白原话置顶 + 按馆找货清单（分组与官方助手 W2/W3/W4/E2/E3 一致） */
+const CONCIERGE_URL="https://concierge.cfce-cn.com/#/chat?exhibitionId=2&lang=zh";
+const AI_PITCH="我需要找冷链出口，还有预制菜商。我想在希腊开餐馆，主要做亚洲融合菜，类似相关的，包括物流、设备、物品采集。";
+const AI_PITCH2="我需要找冷链出口和预制菜供应商。我在希腊开亚洲融合菜连锁餐馆（拉面＋沙冰＋预制菜便当），要找四类东西：① 能出口欧盟的预制菜/调理包/冷冻食材（必须有欧盟出口资质和全程冷链）② 冷链货代（海运到希腊比雷埃夫斯港，拼柜整柜都要问）③ 厨房和包装设备（小型速冻线、可降解包材）④ 米面粮油、汤底酱汁、餐具包材等物料。有欧盟出口经验的展商请留下联系方式。";
+const AI_HALLS=[
+ {h:"E2 · 湘菜出海专区",t:"今天 9/18 上午",q:"E2 湘菜出海专区 出口欧盟 预制菜 餐饮食材",asks:["你们有欧盟出口资质吗？走哪家货代？","预制菜/调理包能冷冻或常温运欧洲吗？保质期多长？","欧洲有没有已合作的客户？举个案例"]},
+ {h:"E3 · 食材+包装机械",t:"今天 9/18 下午 ＋ 明天全天对接",q:"E3 包装机械 速冻生产线 可降解外卖包装",asks:["小型速冻线/急冻柜最小型号、产能、价格？","可降解餐盒托盘能印 LOGO 吗？MOQ 多少？","对接会 10:00–16:30 带采购清单，专找粉面/速冻对口"]},
+ {h:"W3 · 湖南预制菜整馆",t:"今天 9/18 15:30 起（主业）",q:"W3 湖南预制菜 出口欧盟 OEM 贴牌",asks:["哪些品能出口欧盟？冷冻还是常温？","能 OEM 贴牌吗？最低起订量多少？","香米/米粉制品有出口案例吗？清关谁负责？"]},
+ {h:"W4 · 调味品+供应链装备",t:"今天 9/18 16:30 ＋ 明天补漏",q:"W4 冷链物流 货代 出口欧洲 调味品",asks:["长沙/广州 → 比雷埃夫斯港：拼柜/整柜报价和时效？","汤底酱汁出欧盟：标签和成分合规谁来做？","欧洲端能对接仓储/溯源吗？"]},
+ {h:"W2 · 东盟对接会",t:"9/20 上午 9:30–12:00",q:"W2 进口食品 东盟 冷冻水产",asks:["东盟冷冻水产/东南亚原料：出欧盟的资质与货代","对照采购清单补缺：还有什么品类能替换进货"]}
+];
+function aiAllText(){
+  let out=AI_PITCH+"\n\n（按馆找货：在 AI 观助手里粘各馆「找展位输入」，结果加进「我的兴趣清单」照单走馆）\n";
+  AI_HALLS.forEach(x=>{ out+="\n【"+x.h+" · "+x.t+"】\nAI 找展位输入："+x.q+"\n"+x.asks.map((s,i)=>(i+1)+". "+s).join("\n")+"\n"; });
+  return out;
+}
 function expoIsOn(g,it,i){ const k=g.id+"-"+i; return expoDone[k]===undefined ? !!it.def : !!expoDone[k]; }
 function expoToggle(cb){
   expoDone[cb.id]=cb.checked; expoSave();
@@ -1869,6 +1888,23 @@ function renderExpo(){
     +'<li><b>对接靠邮件</b>：需求发 cfce_hn@163.com（客户联络中心 0731-82287397），无在线申请表</li>'
     +'<li><b>交通</b>：一百米酒店 → 地铁 2 号线 1 站 3 分钟到光达站（比打车稳）；展馆周边吃饭少，早晚餐去南站东广场 / 长沙高铁吾悦广场</li></ul>'
     +'<button class="ghost wide" id="mailCopy" style="margin-top:10px">📧 复制给组委会的需求邮件</button></div>';
+
+  h+='<h2 class="sec">🤖 AI 观展 · 按馆找货清单（今天+明天主用）</h2><div class="card">'
+    +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px">'
+    +'<a class="mapchip" href="'+CONCIERGE_URL+'" target="_blank" rel="noopener" style="margin:0">🤖 打开 AI 观展助手</a>'
+    +'<span style="font-size:12px;color:var(--mute);flex:1;min-width:150px">免登录，扫码即用。若显示「展会服务暂未开放」＝主办方开关没开，微信上直接找组委会廖先生（13487318646）开一下；找展位/平面图不受影响</span></div>'
+    +'<div style="font-size:13px;color:var(--ink-2);line-height:1.6;margin:10px 0 2px"><b>我的开场白（贴进「告诉我你想找什么」，或直接发微信给展商）：</b></div>'
+    +'<div style="font-size:13.5px;line-height:1.7;color:var(--ink);background:var(--indigo-soft);border:1px solid #C9D6E4;border-radius:10px;padding:10px 12px;margin:6px 0 8px">'+esc(AI_PITCH)+'</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<button class="ghost" id="aiPitchCopy" style="flex:1;min-width:130px">📋 复制原话开场白</button>'
+    +'<button class="ghost" id="aiPitch2Copy" style="flex:1;min-width:130px">📋 复制加强版开场白</button></div>'
+    +'<details style="margin:8px 0 0"><summary style="font-size:12.5px;color:var(--indigo);cursor:pointer">加强版开场白长什么样（点开看）</summary><div style="font-size:12.5px;color:var(--ink-2);line-height:1.65;margin-top:6px">'+esc(AI_PITCH2)+'</div></details>'
+    +'<div style="font-size:13px;color:var(--ink-2);line-height:1.6;margin:10px 0 2px"><b>用法</b>：打开助手 → 粘下面各馆的「找展位输入」→ 结果按馆分组 → 都加进「我的兴趣清单」→ 照清单走馆，见一家问一家。</div>'
+    +AI_HALLS.map(x=>'<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px"><b style="font-size:13.5px;color:var(--ink)">'+esc(x.h)+'</b><span style="font-size:12px;color:var(--mute)">　'+esc(x.t)+'</span>'
+      +'<div style="font-size:12.5px;color:var(--indigo);margin:4px 0">AI 找展位输入：<b>'+esc(x.q)+'</b></div>'
+      +'<ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.6;color:var(--ink-2)">'+x.asks.map(s=>'<li>'+esc(s)+'</li>').join("")+'</ul></div>').join("")
+    +'<button class="ghost wide" id="aiAllCopy" style="margin-top:10px">📋 复制整份按馆清单（含开场白）</button>'
+    +'<p style="font-size:12px;color:var(--mute);margin:8px 0 0;line-height:1.5">你后头要补的展商问题直接发我，我按馆挂进对应位置。</p></div>';
 
   h+='<h2 class="sec">🏢 食餐会已知展商（少数有展位号）</h2><div class="card" style="overflow-x:auto"><table style="min-width:480px;width:100%;border-collapse:collapse;font-size:12.5px;line-height:1.45">'
     +'<tr><th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);color:var(--mute);font-size:11.5px">展商</th>'
@@ -2033,6 +2069,12 @@ function renderExpo(){
   document.getElementById("v-expo").innerHTML=h;
   const ml=document.getElementById("mailCopy");
   if(ml) ml.onclick=function(){ copyText(mailText(),"邮件已复制，粘到邮件 App 就能发"); };
+  const ap1=document.getElementById("aiPitchCopy");
+  if(ap1) ap1.onclick=function(){ copyText(AI_PITCH,"开场白已复制，粘进 AI 观展或发微信给展商"); };
+  const ap2=document.getElementById("aiPitch2Copy");
+  if(ap2) ap2.onclick=function(){ copyText(AI_PITCH2,"加强版开场白已复制，四类需求一次说清"); };
+  const ap3=document.getElementById("aiAllCopy");
+  if(ap3) ap3.onclick=function(){ copyText(aiAllText(),"整份按馆清单已复制，粘给自己或发我加工"); };
   expoRender();
   const ee2=document.getElementById("expoExp");
   if(ee2) ee2.onclick=function(){ expoExport(); };
